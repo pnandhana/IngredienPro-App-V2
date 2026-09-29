@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><title>shot</title>
+<style>html,body{margin:0;background:#d6d6d6}iframe{border:0;display:block}</style>
+<iframe id="f"></iframe>
+<script>
+/* Headless Chrome lays a top-level page out wider than --window-size and then crops,
+   which makes direct screenshots lie about responsive behaviour. Rendering inside an
+   iframe of an exact width gives an honest picture.
+     chrome --headless=new --screenshot=out.png --window-size=<w>,<h> \
+       "tools/shot.html?w=<w>&h=<h>&r=<role>&p=<hash path>"                          */
+const P = new URLSearchParams(location.search);
+const w = +(P.get('w') || 390), h = +(P.get('h') || 1400);
+const f = document.getElementById('f');
+f.style.width = w + 'px';
+f.style.height = h + 'px';
+f.src = '../index.html?as=' + (P.get('r') || 'guest') + '#' + (P.get('p') || '/');
+</script>

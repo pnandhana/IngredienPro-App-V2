@@ -1,0 +1,127 @@
+<!doctype html><meta charset="utf-8"><title>rescheck</title>
+<style>html,body{margin:0}#f{border:0}pre{font:12px/1.4 ui-monospace,Menlo,monospace;padding:8px}</style>
+<pre id="out">running</pre>
+<iframe id="f"></iframe>
+<script>
+/* Loads every screen at a given viewport width and reports any node that sticks out
+   past the right edge of the screen, or any horizontal scroll on the page itself.
+   Run with:  chrome --headless=new --dump-dom --window-size=W,2200 tools/rescheck.html?w=W  */
+const P = new URLSearchParams(location.search);
+const W = +(P.get('w') || 390);
+const ONLY = P.get('only');            // optional: a comma-separated list of screen ids
+const ROUTES = P.get('routes');        // optional: measure live app routes instead of raw frames
+const LIMIT = +(P.get('limit') || 0);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const F = document.getElementById('f');
+F.style.width = W + 'px'; F.style.height = '2000px';
+const D = () => F.contentDocument, Wn = () => F.contentWindow;
+
+/* virtual time makes Date.now() jump, so poll a fixed number of times instead */
+async function until(fn, tries = 120) {
+  for (let i = 0; i < tries; i++) { try { const v = fn(); if (v) return v; } catch (e) {} await sleep(60); }
+  return null;
+}
+window.onerror = (m, f, l) => { document.getElementById('out').textContent = 'ERROR ' + m + ' @' + l; document.title = 'done'; };
+window.onunhandledrejection = e => { document.getElementById('out').textContent = 'REJECTED ' + (e.reason && e.reason.message || e.reason); document.title = 'done'; };
+
+function measure() {
+  const scr = D().querySelector('.screen');
+  if (!scr) return { err: 'no screen' };
+  const sr = scr.getBoundingClientRect();
+  const bad = [];
+  const seen = new Set();
+  /* An element is only really broken if it spills past whatever would clip it —
+     its nearest clipping ancestor, or the screen. Ancestors that scroll sideways
+     are meant to hold more than they show, so anything inside one is fine. */
+  const cs = el => Wn().getComputedStyle(el);
+  function limitFor(el) {
+    let p = el.parentElement;
+    while (p && p !== scr) {
+      const ov = cs(p).overflowX;
+      if (ov === 'auto' || ov === 'scroll') return null;          // scrolls on purpose
+      if (ov === 'hidden' || ov === 'clip') return p.getBoundingClientRect();
+      p = p.parentElement;
+    }
+    return sr;
+  }
+  D().querySelectorAll('.screen [data-name]').forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return;
+    const lim = limitFor(el);
+    if (!lim) return;
+    const over = Math.round(r.right - lim.right);
+    if (over <= 2) return;
+    let p = el.parentElement, covered = false;
+    while (p && p !== scr) { if (seen.has(p)) { covered = true; break; } p = p.parentElement; }
+    if (covered) return;
+    seen.add(el);
+    bad.push({ name: el.dataset.name, over, w: Math.round(r.width) });
+  });
+  return { bad, docOver: Math.round(Wn().document.documentElement.scrollWidth - W) };
+}
+
+(async () => {
+  const out = document.getElementById('out');
+  F.src = '../index.html#/';
+  await until(() => D() && D().querySelector('.screen'));
+  await sleep(300);
+  /* MANIFEST is a top-level const in the app, so it never lands on window — read the file */
+  const txt = await (await fetch('../js/manifest.js')).text();
+  const man = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1)).screens;
+  let ids = Object.keys(man);
+  if (ONLY) ids = ONLY.split(',');
+  if (LIMIT) ids = ids.slice(0, LIMIT);
+
+  /* live routes: role|path pairs, e.g. "guest|/,buyer|/myenq,seller|/hub" */
+  if (ROUTES) {
+    const rows2 = [], tally2 = {};
+    let screens = 0;
+    for (const spec of ROUTES.split(',')) {
+      const [role, path] = spec.split('|');
+      F.src = '../index.html?as=' + role + '#' + path;
+      await until(() => D() && D().querySelector('.screen'));
+      await sleep(500);
+      const m = measure();
+      if (m.err) { rows2.push(spec + '  ERROR ' + m.err); continue; }
+      if (m.bad.length) {
+        screens++;
+        rows2.push('· ' + spec);
+        for (const b of m.bad.slice(0, 6)) {
+          rows2.push('      +' + String(b.over).padStart(4) + 'px  ' + b.name + '  (w' + b.w + ')');
+          tally2[b.name] = (tally2[b.name] || 0) + 1;
+        }
+      }
+    }
+    const top2 = Object.entries(tally2).sort((a, b) => b[1] - a[1]);
+    out.textContent = 'width ' + W + '  ·  live routes  ·  ' + (screens ? screens + ' overflow' : 'all clean') +
+      '\n\n' + (top2.length ? top2.map(([n, c]) => '  ' + String(c).padStart(3) + '  ' + n).join('\n') : '  none') +
+      '\n\nDETAIL\n' + rows2.join('\n');
+    document.title = 'done';
+    return;
+  }
+
+  const rows = [];
+  const tally = {};
+  for (const id of ids) {
+    Wn().location.hash = '#/s/' + id.replace(':', '-');
+    await until(() => { const s = D().querySelector('.screen'); return s && s.dataset.id === id; }, 60);
+    await sleep(260);
+    const m = measure();
+    if (m.err) { rows.push(id + '  ' + man[id].name + '  ERROR ' + m.err); continue; }
+    if (m.bad.length) {
+      rows.push('· ' + man[id].name.slice(0, 52));
+      for (const b of m.bad.slice(0, 6)) {
+        rows.push('      +' + String(b.over).padStart(4) + 'px  ' + b.name + '  (w' + b.w + ')');
+        tally[b.name] = (tally[b.name] || 0) + 1;
+      }
+    }
+  }
+  const top = Object.entries(tally).sort((a, b) => b[1] - a[1]);
+  out.textContent =
+    'width ' + W + '  ·  ' + ids.length + ' screens  ·  ' +
+    (top.length ? rows.filter(r => r[0] === '·').length + ' screens overflow' : 'all clean') + '\n\n' +
+    'WORST OFFENDERS\n' + (top.length ? top.map(([n, c]) => '  ' + String(c).padStart(3) + '  ' + n).join('\n') : '  none') +
+    '\n\nDETAIL\n' + rows.join('\n');
+  document.title = 'done';
+})();
+</script>

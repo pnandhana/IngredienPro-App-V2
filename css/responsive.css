@@ -1,0 +1,426 @@
+/* Responsive layer.
+   The screens come out of Figma drawn at 1440 with hard pixel widths baked into
+   inline styles, so everything here overrides inline style and has to be !important.
+   The page always fills the window — it is never a 1440 canvas floating on grey.
+   At 1440 the layout is the wireframe as drawn; wider, the bands stay full-bleed and
+   the gutters grow; narrower, it reflows rather than scaling down, so the type stays
+   at the size it was designed at.
+
+     > 1440  gutters grow so the reading column stops widening
+     < 1440  nothing may exceed the canvas
+     < 1100  denser gutters, the account rail drops to its icon-only state
+     <  900  the top nav folds into a hamburger drawer
+     <  760  one column: stacked shell, My enQ list ⇄ chat, all fixed widths released
+
+   The last three match App.BP (nav 900, phone 760, tablet 1100). */
+
+/* ---------------------------------------------------------------- fluid canvas */
+#stage {
+  display: block;
+  /* The flow sidebar takes 272px out of the window, so every breakpoint below is
+     asked of the app's own width, not the viewport's. */
+  container-type: inline-size;
+  container-name: stage;
+}
+.screen {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100vh;
+  margin: 0;
+}
+/* Figma exports flex-shrink:0 on most children; let them give way when they must. */
+.screen [data-name] { min-width: 0; }
+
+/* ---------------------------------------------------- absolute positions flow
+   Figma frames with no auto-layout hold their children at absolute x/y, and a
+   modal is pinned at the x it had on a 1440 canvas. Neither survives a window
+   that is not exactly 1440 wide, in either direction, so both flow at every width. */
+
+
+/* a pop-up drawn onto its screen recentres instead of sitting at its 1440 offset.
+   Only the centring is universal — the modal keeps its drawn width until the page
+   is narrower than it was drawn for. */
+.screen > [data-name^="Modal /"],
+.screen > [data-name^="Dialog /"] { left: 50% !important; transform: translateX(-50%); }
+.screen > [data-name="Scrim"],
+.screen > [data-name^="Background /"] { width: 100% !important; }
+
+/* ------------------------------------------------- free canvases, at any width
+   These have to apply above 1440 as well: a window wider than the drawn canvas
+   leaves absolute children stuck at their 1440 offsets, sitting off-centre. */
+.screen.is-free, .screen .is-free {
+  display: flex !important;
+  height: auto !important;
+  gap: var(--free-gap) !important;
+  padding: var(--free-pt) var(--free-pr) var(--free-pb) var(--free-pl) !important;
+}
+.screen.is-free-col, .screen .is-free-col { flex-direction: column !important; flex-wrap: nowrap !important; align-items: stretch !important; }
+.screen.is-free-row, .screen .is-free-row { flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; }
+.screen.is-free > [data-name], .screen .is-free > [data-name] {
+  position: static !important; left: auto !important; top: auto !important;
+  max-width: 100% !important;
+}
+.screen .is-free-col > [data-name] { width: 100% !important; align-self: stretch !important; }
+
+/* a free-canvas screen (log in, register) centres what it flows */
+.screen.is-canvas { align-items: center; min-height: 100vh; padding-bottom: 48px !important; }
+.screen.is-canvas > [data-name] { width: 100% !important; max-width: 560px !important; flex: 0 0 auto !important; }
+.screen.is-canvas > [data-name="Auth header"],
+.screen.is-canvas > [data-name^="Background /"],
+.screen.is-canvas > [data-name="Navigation bar"] { max-width: none !important; }
+.screen.is-canvas > [data-name="Login card"],
+.screen.is-canvas > [data-name^="Card"] { margin-top: 32px; }
+
+/* the decorative chat mock on the home page clips in Figma; make it clip here too */
+.screen [data-name="Vignette"] { overflow: hidden !important; }
+
+/* Turning a row into a column is not enough: Figma's FILL became flex:1 1 0 on the
+   horizontal axis, so once the axis flips the children size to their content and
+   collapse. They have to be stretched back. */
+.screen [data-name="Body"],
+.screen [data-name="Panes"],
+.screen [data-name="Footer columns"],
+.screen [data-name="Steps"] { align-items: stretch !important; }
+.screen [data-name="Body"] > [data-name],
+.screen [data-name="Panes"] > [data-name],
+.screen [data-name="Footer columns"] > [data-name],
+.screen [data-name="Steps"] > [data-name] { align-self: stretch !important; }
+
+/* ============================================ below the drawn width (< 1440px) */
+@container stage (max-width: 1439px) {
+  /* a 1440-wide header or scrim must not define the page any more */
+  .screen [data-name] { max-width: 100% !important; }
+
+  /* a modal drawn 640 wide has to give way once the page is narrower than it was drawn for */
+  .screen > [data-name^="Modal /"],
+  .screen > [data-name^="Dialog /"] { width: calc(100% - 32px) !important; max-width: 560px !important; }
+
+  /* page gutters shrink with the page instead of eating it */
+  .screen { --gutter: 48px; }
+  .screen .has-gutter {
+    padding-left: min(var(--gut-l), var(--gutter)) !important;
+    padding-right: min(var(--gut-r), var(--gutter)) !important;
+  }
+  .screen.is-free, .screen .is-free {
+    padding-left: min(var(--free-pl), var(--gutter)) !important;
+    padding-right: min(var(--free-pr), var(--gutter)) !important;
+    padding-top: min(var(--free-pt), 64px) !important;
+    padding-bottom: min(var(--free-pb), 64px) !important;
+  }
+
+  /* strips that keep their shape and scroll sideways instead */
+  .screen [data-name="Stepper"],
+  .screen [data-name="Profile section tabs"],
+  .screen [data-name="Tabs"],
+  .screen [data-name="Tabs / Edit · Preview"],
+  .screen [data-name="Group switch"],
+  .screen [data-name="Chat starters"],
+  .screen [data-name="Method switch"] {
+    overflow-x: auto !important; flex-wrap: nowrap !important;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .screen [data-name="Stepper"]::-webkit-scrollbar,
+  .screen [data-name="Profile section tabs"]::-webkit-scrollbar,
+  .screen [data-name="Tabs"]::-webkit-scrollbar,
+  .screen [data-name="Tabs / Edit · Preview"]::-webkit-scrollbar,
+  .screen [data-name="Chat starters"]::-webkit-scrollbar,
+  .screen [data-name="Method switch"]::-webkit-scrollbar { display: none; }
+  .screen [data-name="Chat starters"] > [data-name] { flex: 0 0 auto !important; }
+  .screen [data-name="Stepper"] > [data-name],
+  .screen [data-name="Profile section tabs"] > [data-name],
+  .screen [data-name="Tabs"] > [data-name] { flex: 0 0 auto !important; }
+
+  /* last resort: any row that still cannot fit folds rather than overflows.
+         Wrapping only takes effect when the children genuinely do not fit, so rows
+         that already fit are untouched. The strips that must stay on one line and
+         scroll instead are re-asserted below. */
+  .screen .is-row { flex-wrap: wrap !important; row-gap: 6px !important; }
+  /* Figma's FILL becomes flex:1 1 0, and a basis of zero means a row squeezes its
+     children to nothing instead of wrapping. Basing them on their content makes the
+     row fold first, which is what "wrap" was meant to do. */
+  .screen .is-row > [data-name] { flex-basis: auto !important; }
+  /* …except the panes that are meant to take whatever is left: a content-sized basis
+     would push them onto their own line while there is still room beside the list */
+  .screen [data-name="Panes"] > [data-name^="Pane / Thread"],
+  .screen [data-name="Body"] > [data-name="Main"],
+  .screen [data-name="Body"] > [data-name="Article"],
+  .screen [data-name="Category browser"] > [data-name^="Panel /"],
+  .screen [data-name="Header"] > [data-name="spacer"] { flex: 1 1 0 !important; }
+  /* the subcategory grid is a wrapping card grid — its cards keep their drawn width
+     and fold onto the next line, rather than being squeezed or stretched */
+  .screen [data-name="Subcategory grid"] > [data-name^="Card / "] { flex: 0 0 auto !important; }
+
+  /* text drawn to fit 1440 may wrap; pre-wrap keeps the spacing the designer set */
+  .screen .t-pre { white-space: pre-wrap !important; }
+
+  /* cards that wrap should share the line evenly rather than sizing to their text */
+  .screen [data-name="Category row"] > [data-name],
+  .screen [data-name="tiles"] > [data-name],
+  .screen [data-name="Matching products"] > [data-name],
+  .screen [data-name="Row"] > [data-name] { flex: 1 1 200px !important; }
+  .screen .is-row[data-name="Stepper"],
+  .screen .is-row[data-name="Profile section tabs"],
+  .screen .is-row[data-name="Tabs"],
+  .screen .is-row[data-name="Tabs / Edit · Preview"],
+  .screen .is-row[data-name="Group switch"],
+  .screen .is-row[data-name="Method switch"],
+  .screen .is-row[data-name="Chat starters"],
+  .screen .is-row[data-name="Account sidebar"] { flex-wrap: nowrap !important; }
+  /* an avatar and its text should never come apart (but a row that also carries a
+     trailing action, like "identity", may fold that action onto its own line) */
+  .screen .is-row[data-name="inner"],
+  .screen .is-row[data-name="Avatar slot"],
+  .screen .is-row[data-name="avatar"] { flex-wrap: nowrap !important; }
+
+}
+
+/* ================================================ wider than drawn (> 1440px) */
+@container stage (min-width: 1441px) {
+  /* the header, the footer and every band still span the window; only the content
+     inside them stops growing, so lines do not run to 1600 characters */
+  .screen .has-gutter {
+    padding-left: calc(var(--gut-l) + (100% - 1440px) / 2) !important;
+    padding-right: calc(var(--gut-r) + (100% - 1440px) / 2) !important;
+  }
+}
+
+/* =============================================================== tablet & below */
+@container stage (max-width: 1099px) {
+  .screen { --gutter: 24px; }
+
+  /* rows that were drawn to fit 1440 and simply need to fold */
+  .screen [data-name="Auth header"],
+  .screen [data-name="Footer columns"],
+  .screen [data-name="Steps"],
+  .screen [data-name="Recovery steps"],
+  .screen [data-name="Row"],
+  .screen [data-name="Grid"],
+  .screen [data-name="Matching products"],
+  .screen [data-name="Search & filters"],
+  .screen [data-name="Page head"],
+  .screen [data-name="Prev / next"],
+  .screen [data-name="Was this helpful"],
+  .screen [data-name="Post a requirement"],
+  .screen [data-name="Popular searches"],
+  .screen [data-name="Demo state chips"],
+  .screen [data-name="Chips"],
+  .screen [data-name="Trust strip"],
+  .screen [data-name="Category row"],
+  .screen [data-name="Other forms"],
+  .screen [data-name="Extracted"],
+  .screen [data-name="Breadcrumb"],
+  .screen [data-name="Header actions"],
+  .screen [data-name="tiles"],
+  .screen [data-name="Variety chips"],
+  .screen [data-name="Certification proof"],
+  .screen [data-name="Filters"],
+  .screen [data-name="Hero"],
+  .screen [data-name="Section / Product guide"],
+  .screen [data-name="Spec head"],
+  .screen [data-name="Section link / How verification works"],
+  .screen [data-name="Title"],
+  .screen [data-name="Label"],
+  .screen [data-name="name"] { flex-wrap: wrap !important; height: auto !important; row-gap: 8px !important; }
+
+  /* the header keeps one line: the logo and the spacer give way, not the actions */
+  .screen [data-name="Header"] > [data-name="spacer"] { flex: 1 1 0 !important; min-width: 0 !important; }
+  .screen [data-name="Header"] > [data-name="Logo"] { flex: 0 1 auto !important; min-width: 0 !important; overflow: hidden !important; }
+  .screen [data-name="Header"] > [data-name="Header actions"] { flex: 0 0 auto !important; }
+
+  /* the seller directory row: identity keeps the width, the rest drops under it */
+  .screen [data-name^="Seller row"] { flex-wrap: wrap !important; row-gap: 16px !important; }
+  .screen [data-name^="Seller row"] > [data-name="divider"] { display: none !important; }
+  .screen [data-name^="Seller row"] > [data-name="identity"] { flex: 1 1 260px !important; }
+  .screen [data-name^="Seller row"] > [data-name="Categories sold"] { flex: 1 1 100% !important; }
+  .screen [data-name^="Seller row"] > [data-name="actions"] {
+    flex: 1 1 100% !important; flex-direction: row !important; flex-wrap: wrap !important;
+  }
+  /* the two buttons share the line instead of each claiming the full width */
+  .screen [data-name^="Seller row"] [data-name="actions"] > [data-name^="Btn /"] {
+    flex: 1 1 150px !important; width: auto !important; min-width: 150px !important;
+  }
+
+  /* --- My enQ: one pane at a time, switched by the toggle. 340 for the list plus
+         whatever is left is too narrow for a chat below 1100. --- */
+  .screen [data-name="Panes"] { flex-direction: column !important; flex-wrap: nowrap !important; }
+  .screen [data-name="Panes"] > [data-name] { width: 100% !important; flex: 1 1 auto !important; }
+  html:not([data-mode="desktop"]) .screen[data-pane="thread"] [data-name="Panes"] > [data-name="Pane / My enQ"] { display: none !important; }
+  html:not([data-mode="desktop"]) .screen[data-pane="list"] [data-name="Panes"] > [data-name^="Pane / Thread"] { display: none !important; }
+
+  /* the account rail drops to its own 64px icon-only state */
+  .screen [data-name="Account sidebar"] { width: 64px !important; flex: 0 0 64px !important; }
+  .screen [data-name="Sidebar space (sidebar is fixed)"] { width: 64px !important; flex: 0 0 64px !important; }
+}
+
+/* ============================================= the top nav folds (< 900px) */
+@container stage (max-width: 899px) {
+  .screen [data-name="Utility bar"] { display: none !important; }
+  .screen [data-name="Header"] { padding-left: 16px !important; padding-right: 16px !important; gap: 12px !important; }
+  .screen [data-name="Primary nav"] { display: none !important; }
+  .screen [data-name="Header actions"] > [data-name="Btn / Register Free"],
+  .screen [data-name="Header actions"] > [data-name="Btn / Sell on IngredienPro"] { display: none !important; }
+  .screen [data-name="My Account menu"] [data-name="t"],
+  .screen [data-name="Account"] [data-name="t"] { display: none !important; }
+  .screen [data-name="Header"] > [data-name="Logo"] > [data-name^="Chip /"] { display: none !important; }
+  .screen [data-name="Header actions"] { gap: 8px !important; }
+}
+
+/* ======================================================================= phone */
+@container stage (max-width: 759px) {
+  /* --- the whole shell goes single column --- */
+  .screen [data-name="Body"] { flex-direction: column !important; flex-wrap: nowrap !important; }
+
+  .screen { --gutter: 16px; }
+  .screen [data-name="Main"],
+  .screen [data-name="Content"],
+  .screen [data-name="Body"] > [data-name="Article"] { padding-left: 16px !important; padding-right: 16px !important; }
+
+
+  /* --- the account rail becomes a scrolling strip above the content --- */
+  .screen [data-name="Account sidebar"] {
+    width: 100% !important; flex: 0 0 auto !important; height: auto !important;
+    flex-direction: row !important; overflow-x: auto !important; overflow-y: hidden !important;
+    gap: 4px !important; padding: 8px 12px !important;
+    border-right: 0 !important; border-bottom: 1px solid #e6e6e6 !important;
+    scrollbar-width: none;
+  }
+  .screen [data-name="Account sidebar"]::-webkit-scrollbar { display: none; }
+  .screen [data-name="Account sidebar"] > [data-name^="Item /"] {
+    width: auto !important; height: 40px !important; flex: 0 0 auto !important;
+    padding: 0 14px !important; border-radius: 20px !important;
+  }
+  .screen [data-name="Account sidebar"] > [data-name="Head"],
+  .screen [data-name="Account sidebar"] > [data-name="spacer"],
+  .screen [data-name="Sidebar space (sidebar is fixed)"] { display: none !important; }
+
+  /* --- everything that was drawn at a fixed width --- */
+  .screen [data-name^="Modal /"],
+  .screen [data-name^="Dialog /"],
+  .screen [data-name="Card"],
+  .screen [data-name="Column"],
+  .screen [data-name="Side"],
+  .screen [data-name="Filter rail"],
+  .screen [data-name="Rail / Families"],
+  .screen [data-name="Column / Subcategories"],
+  .screen [data-name="Company facts"],
+  .screen [data-name="Card / Add-ons"],
+  .screen [data-name="Search block"],
+  .screen [data-name="Product image"],
+  .screen [data-name="Typical specifications"],
+  .screen [data-name="Suggestions dropdown"],
+  .screen [data-name="notice"],
+  .screen [data-name="Input"],
+  .screen [data-name="Progress"],
+  .screen [data-name^="Btn /"] { width: 100% !important; flex-basis: auto !important; }
+  /* the composer is a toolbar, not a stack of buttons */
+  .screen [data-name="Input row"] > [data-name^="Btn /"],
+  .screen [data-name="Input row"] > [data-name^="Icon /"] { width: auto !important; flex: 0 0 auto !important; }
+
+  .screen [data-name="bubble"] { max-width: 86% !important; }
+
+  /* --- rows that must not squeeze --- */
+  .screen [data-name="Search bar"] { flex-wrap: wrap !important; height: auto !important; row-gap: 8px !important; }
+  .screen [data-name="Search bar"] > [data-name="divider"] { display: none !important; }
+  .screen [data-name="Search bar"] > [data-name="Input"] { flex: 1 1 100% !important; }
+  .screen [data-name="Footer columns"] { flex-direction: column !important; flex-wrap: nowrap !important; gap: 28px !important; }
+  .screen [data-name="Steps"] { flex-direction: column !important; flex-wrap: nowrap !important; }
+  .screen [data-name="Steps"] > [data-name] { width: 100% !important; }
+  .screen [data-name="Product row"] { flex-wrap: wrap !important; row-gap: 12px !important; }
+  .screen [data-name="Notification row"] { align-items: flex-start !important; }
+
+  /* --- chat --- */
+  /* the composer keeps a usable field: below that the icons fold to a second line
+     rather than squeezing the input to nothing */
+  .screen [data-name="Input row"] > [data-name="input"] { flex: 1 1 150px !important; min-width: 150px !important; }
+  .screen [data-name="Input row"] > [data-name="input"] { overflow: hidden !important; }
+  .screen [data-name="Input row"] > [data-name="input"] > [data-name] { min-width: 0 !important; width: 100% !important; }
+  .screen [data-name="Thread head"] { padding-left: 14px !important; padding-right: 14px !important; }
+  .screen [data-name="Enquiry meta"] { flex-wrap: wrap !important; row-gap: 6px !important; padding-left: 14px !important; padding-right: 14px !important; }
+  .screen [data-name="Chat starters"] { overflow-x: auto !important; flex-wrap: nowrap !important; scrollbar-width: none; }
+  .screen [data-name="Chat starters"]::-webkit-scrollbar { display: none; }
+  .screen [data-name="Chat starters"] > [data-name] { flex: 0 0 auto !important; }
+
+  /* a scrolling tab strip that only shows one tab is worse than two rows of tabs */
+  .screen .is-row[data-name="Profile section tabs"],
+  .screen .is-row[data-name="Tabs"] { flex-wrap: wrap !important; overflow-x: visible !important; row-gap: 4px !important; }
+  .screen [data-name="Profile section tabs"] > [data-name],
+  .screen [data-name="Tabs"] > [data-name] { width: auto !important; flex: 0 0 auto !important; }
+
+  /* --- tables collapse into stacked rows --- */
+  .screen [data-name="Table head"] { display: none !important; }
+  .screen [data-name^="Row /"] { flex-wrap: wrap !important; row-gap: 8px !important; }
+}
+
+/* =============================================== app chrome at narrow widths */
+@media (max-width: 759px) {
+  .toast { left: 8px; right: 8px; bottom: 76px; transform: translateY(20px); max-width: none; }
+  .toast.in { transform: translateY(0); }
+  .overlay { padding: 0; align-items: flex-end; }
+  .overlay-box { width: 100%; margin: 0; }
+  .overlay-box > [data-name] { border-radius: 16px 16px 0 0 !important; }
+  .mini-modal { width: 100%; border-radius: 16px 16px 0 0; }
+}
+
+@container stage (max-width: 759px) {
+  .more-menu { right: auto; left: 0; min-width: 200px; }
+}
+
+/* ------------------------------------------------------- the mobile nav drawer */
+.navdrawer {
+  position: fixed; inset: 0; z-index: 1150; display: none;
+  font: 15px/1.5 Inter, system-ui, sans-serif;
+}
+.navdrawer.open { display: block; }
+.navdrawer-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .45); animation: fade .18s ease-out; }
+.navdrawer-panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(320px, 86vw);
+  background: #fff; padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 4px; overflow: auto;
+  box-shadow: -12px 0 40px rgba(0, 0, 0, .18);
+  animation: slide-in .26s cubic-bezier(.22, 1, .36, 1);
+}
+.navdrawer h2 { margin: 0 0 12px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #767676; font-weight: 600; }
+.navdrawer button {
+  appearance: none; border: 0; background: none; text-align: left;
+  font: 500 16px/1.4 Inter, system-ui, sans-serif; color: #111;
+  padding: 13px 12px; border-radius: 10px; cursor: pointer; min-height: 48px;
+}
+.navdrawer button:hover, .navdrawer button:focus-visible { background: #f4f4f4; }
+.navdrawer button.on { background: #111; color: #fff; }
+.navdrawer hr { border: 0; border-top: 1px solid #ededed; margin: 12px 0; width: 100%; }
+.navdrawer .nd-close { position: absolute; top: 14px; right: 14px; width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center; font-size: 20px; padding: 0; }
+
+.hamburger {
+  display: none; width: 44px; height: 44px; flex: 0 0 44px;
+  align-items: center; justify-content: center; cursor: pointer;
+  border: 1px solid #e0e0e0; border-radius: 10px; background: #fff;
+}
+.hamburger span { display: block; width: 18px; height: 1.5px; background: #111; box-shadow: 0 -5px 0 #111, 0 5px 0 #111; transition: transform .2s ease; }
+@container stage (max-width: 899px) { .hamburger { display: flex !important; } }
+
+/* ------------------------------------- the list / chat switch inside My enQ */
+.pane-switch { display: none; }
+@container stage (max-width: 1099px) {
+  .pane-switch {
+    display: flex; gap: 4px; padding: 4px; margin: 0 0 12px;
+    background: #f2f2f2; border-radius: 12px;
+  }
+  .pane-switch button {
+    flex: 1 1 0; min-height: 44px; border: 0; border-radius: 9px; cursor: pointer;
+    white-space: nowrap; padding: 0 8px;
+    background: transparent; color: #555; font: 600 14px Inter, system-ui, sans-serif;
+    transition: background .18s ease, color .18s ease;
+  }
+  .pane-switch button.on { background: #fff; color: #111; box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
+}
+
+/* --------------------------------------------------------- touch target sizes */
+@media (pointer: coarse) {
+  .screen [data-name^="Btn /"],
+  .screen [data-name^="Chip /"],
+  .screen [data-name^="Pill /"],
+  .screen [data-name^="Item /"],
+  .screen [data-name^="Nav item /"],
+  .screen [data-name^="Tab /"] { min-height: 44px !important; }
+  .more-btn { width: 44px !important; height: 44px !important; border-radius: 22px !important; }
+}

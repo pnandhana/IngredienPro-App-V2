@@ -1,0 +1,169 @@
+/* Motion layer.
+   Nothing here moves anything permanently — it only animates elements into the
+   position the wireframe already puts them in. Durations follow the 150–300ms
+   micro-interaction band; anything that enters does so faster than it leaves the
+   eye, and everything is cancelled under prefers-reduced-motion. */
+
+:root {
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in: cubic-bezier(.55, 0, 1, .45);
+  --t-fast: 140ms;
+  --t-base: 220ms;
+  --t-slow: 320ms;
+}
+
+/* ------------------------------------------------------------ page transition */
+#stage { view-transition-name: stage; }
+
+.screen.enter {
+  animation: screen-in var(--t-base) var(--ease-out) both;
+}
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+/* going back feels like coming from the other side */
+.screen.enter-back { animation-name: screen-in-back; }
+@keyframes screen-in-back {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* the bar that says something is loading, for the rare slow screen fetch */
+#stage.loading::before {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 1300;
+  background: linear-gradient(90deg, transparent, #111, transparent);
+  animation: sweep 900ms linear infinite;
+}
+@keyframes sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* --------------------------------------------------- lists arriving in sequence */
+.screen .stagger > * {
+  animation: row-in var(--t-base) var(--ease-out) both;
+}
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.screen .stagger > *:nth-child(1) { animation-delay: 0ms; }
+.screen .stagger > *:nth-child(2) { animation-delay: 35ms; }
+.screen .stagger > *:nth-child(3) { animation-delay: 70ms; }
+.screen .stagger > *:nth-child(4) { animation-delay: 105ms; }
+.screen .stagger > *:nth-child(5) { animation-delay: 140ms; }
+.screen .stagger > *:nth-child(6) { animation-delay: 175ms; }
+.screen .stagger > *:nth-child(7) { animation-delay: 210ms; }
+.screen .stagger > *:nth-child(n+8) { animation-delay: 240ms; }
+
+/* ------------------------------------------------------------- press feedback */
+.screen .is-link,
+.screen .is-action,
+.navdrawer button,
+.pane-switch button,
+.more-menu button,
+.rb-tabs button {
+  transition: background-color var(--t-fast) ease, border-color var(--t-fast) ease,
+              color var(--t-fast) ease, box-shadow var(--t-fast) ease,
+              transform var(--t-fast) var(--ease-out), filter var(--t-fast) ease;
+}
+.screen .is-link:active,
+.screen .is-action:active { transform: scale(.985); }
+.screen [data-name^="Btn /"]:active,
+.screen [data-name^="Chip /"]:active,
+.screen [data-name^="Pill /"]:active { transform: scale(.97); }
+
+/* rows lift a little rather than just greying out */
+.screen [data-name^="Chat /"].is-link:hover,
+.screen [data-name^="Lead /"].is-link:hover,
+.screen [data-name^="Seller row"]:hover,
+.screen [data-name^="Card /"].is-link:hover,
+.screen [data-name^="Product card"].is-link:hover {
+  filter: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .07);
+}
+.screen [data-name^="Seller row"] { transition: box-shadow var(--t-fast) ease, transform var(--t-fast) var(--ease-out); }
+.screen [data-name^="Seller row"]:hover { transform: translateY(-1px); }
+
+/* a visible focus ring, since the whole thing is divs */
+.screen .is-link:focus-visible,
+.screen .is-action:focus-visible,
+.navdrawer button:focus-visible,
+.pane-switch button:focus-visible {
+  outline: 2px solid #111 !important;
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------- new content */
+/* a message the user just sent, a row that just appeared */
+.screen .sent-here { animation: pop var(--t-base) var(--ease-out) both; }
+@keyframes pop {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+.screen .flash { animation: flash 1s ease-out both; }
+@keyframes flash {
+  0% { background-color: #ededed; }
+  100% { background-color: transparent; }
+}
+/* a count that just changed */
+.screen .bump { animation: bump var(--t-slow) var(--ease-out) both; }
+@keyframes bump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+
+/* ----------------------------------------------------------------- overlays */
+.overlay-scrim { animation: fade var(--t-fast) ease-out both; }
+.overlay-box { animation: modal-in var(--t-base) var(--ease-out) both; }
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(12px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+.overlay.is-closing { pointer-events: none; }
+.overlay.is-closing .overlay-scrim { animation: fade var(--t-fast) ease-in reverse both; }
+.overlay.is-closing .overlay-box { animation: modal-in var(--t-fast) var(--ease-in) reverse both; }
+@media (max-width: 759px) {
+  .overlay-box { animation-name: sheet-in; }
+  @keyframes sheet-in {
+    from { opacity: .4; transform: translateY(100%); }
+    to { opacity: 1; transform: none; }
+  }
+  .overlay.is-closing .overlay-box { animation-name: sheet-in; }
+}
+.suggest-pop { animation: modal-in var(--t-fast) var(--ease-out) both; }
+.more-menu { animation: modal-in var(--t-fast) var(--ease-out) both; transform-origin: top right; }
+
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-in { from { transform: translateX(100%); } to { transform: none; } }
+
+/* ------------------------------------------------ the sticky header settling */
+.screen .is-fixed { transition: box-shadow var(--t-base) ease; }
+.screen .is-fixed.is-stuck { box-shadow: 0 2px 12px rgba(0, 0, 0, .08); }
+
+/* --------------------------------------------------------------- skeletons */
+.skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #ededed 25%, #f6f6f6 37%, #ededed 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.3s ease infinite;
+}
+@keyframes shimmer {
+  from { background-position: 100% 50%; }
+  to { background-position: 0 50%; }
+}
+
+/* ----------------------------------------------------------- reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  .screen .is-link:active,
+  .screen .is-action:active,
+  .screen [data-name^="Seller row"]:hover { transform: none !important; }
+}

@@ -1,0 +1,97 @@
+/* The reviewer's flow sidebar. It sits outside the wireframe — the app pages never
+   see it — and it is the only chrome on the page, so it stays quiet: one dark
+   accent for the current role and the current flow, everything else in greys. */
+
+:root { --fn-w: 272px; }
+
+.flownav {
+  position: fixed; top: 0; left: 0; bottom: 0; width: var(--fn-w); z-index: 1100;
+  display: flex; flex-direction: column;
+  background: #111; color: #fff;
+  font: 13px/1.5 Inter, system-ui, sans-serif;
+}
+
+.fn-top { padding: 18px 16px 14px; border-bottom: 1px solid #262626; }
+.fn-title { font: 600 15px/1.3 Inter, sans-serif; letter-spacing: -.01em; margin-bottom: 14px; }
+.fn-title span { color: #8a8a8a; font-weight: 400; }
+
+/* the role filter */
+.flownav .rolebar {
+  position: static; display: block; padding: 0; margin: 0 0 10px;
+  background: none; box-shadow: none; border-radius: 0; max-width: none;
+}
+.flownav .rb-label { display: block; padding: 0 0 6px; color: #8a8a8a; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.flownav .rb-tabs { display: flex; gap: 3px; background: #1e1e1e; border-radius: 10px; padding: 3px; }
+.flownav .rb-tabs button {
+  flex: 1 1 0; min-width: 0; border: 0; background: transparent; color: #cfcfcf; cursor: pointer;
+  font: 600 12px Inter, sans-serif; padding: 9px 6px; border-radius: 8px; min-height: 40px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: background .15s ease, color .15s ease;
+}
+.flownav .rb-tabs button small { display: block; font-weight: 400; font-size: 10px; color: #8a8a8a; overflow: hidden; text-overflow: ellipsis; }
+.flownav .rb-tabs button:hover { background: #2a2a2a; color: #fff; }
+.flownav .rb-tabs button.on { background: #fff; color: #111; }
+.flownav .rb-tabs button.on small { color: #555; }
+
+.fn-all {
+  width: 100%; border: 1px solid #2f2f2f; background: transparent; color: #cfcfcf;
+  border-radius: 8px; padding: 8px; font: 500 12px Inter, sans-serif; cursor: pointer; min-height: 36px;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.fn-all:hover { background: #1e1e1e; color: #fff; border-color: #3a3a3a; }
+
+/* the flows */
+.fn-flows { flex: 1 1 auto; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin; scrollbar-color: #3a3a3a transparent; }
+.fn-flows::-webkit-scrollbar { width: 8px; }
+.fn-flows::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; }
+
+.fn-flow {
+  display: grid; grid-template-columns: 26px 1fr; gap: 2px 10px;
+  text-align: left; border: 0; background: transparent; color: #fff; cursor: pointer;
+  padding: 10px; border-radius: 10px; min-height: 44px;
+  transition: background .15s ease;
+}
+.fn-flow:hover { background: #1e1e1e; }
+.fn-flow.on { background: #fff; color: #111; }
+.fn-n { grid-row: span 2; font: 600 11px/1.9 Inter, sans-serif; color: #8a8a8a; }
+.fn-flow.on .fn-n { color: #767676; }
+.fn-t { font: 600 13px/1.35 Inter, sans-serif; }
+.fn-note { font: 400 11px/1.45 Inter, sans-serif; color: #9a9aa2; }
+.fn-flow.on .fn-note { color: #555; }
+.fn-empty { color: #8a8a8a; padding: 12px 10px; margin: 0; }
+
+.fn-foot { display: flex; gap: 6px; padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid #262626; }
+.flownav .rb-btn {
+  flex: 1 1 0; background: #1e1e1e; color: #fff; border: 0; border-radius: 8px;
+  padding: 10px 8px; font: 600 12px Inter, sans-serif; cursor: pointer; min-height: 40px; white-space: nowrap;
+}
+.flownav .rb-btn:hover { background: #2a2a2a; }
+
+/* the page sits beside it */
+@media (min-width: 1100px) {
+  body { padding-left: var(--fn-w); }
+  .fn-toggle { display: none; }
+  .overlay, .toast { left: var(--fn-w); }
+  .toast { transform: translate(calc(-50% + var(--fn-w) / 2), 20px); }
+  .toast.in { transform: translate(calc(-50% + var(--fn-w) / 2), 0); }
+}
+
+/* below that it slides in, with its own button clear of the app's own nav */
+@media (max-width: 1099px) {
+  .flownav { transform: translateX(-100%); transition: transform .26s cubic-bezier(.22, 1, .36, 1); box-shadow: 12px 0 40px rgba(0, 0, 0, .25); }
+  .flownav.open { transform: none; }
+  .fn-toggle {
+    position: fixed; left: 12px; bottom: 12px; z-index: 1101;
+    display: flex; align-items: center; gap: 8px;
+    background: #111; color: #fff; border: 0; border-radius: 12px;
+    padding: 12px 16px; min-height: 44px; cursor: pointer;
+    font: 600 13px Inter, system-ui, sans-serif;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+  }
+  .fn-toggle span { width: 14px; height: 1.5px; background: #fff; box-shadow: 0 -4px 0 #fff, 0 4px 0 #fff; }
+  body { padding-bottom: 76px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flownav { transition: none; }
+}

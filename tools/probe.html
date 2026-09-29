@@ -1,0 +1,41 @@
+<!doctype html><meta charset="utf-8"><title>probe</title>
+<!-- Prints the computed ancestor chain for a node, inside an iframe of a fixed width.
+     tools/probe.html?s=<frame-id, dashed>&n=<node name>|<node name>&as=<role>
+     e.g. ?s=283-4467&n=Panes|Pane%20%2F%20Thread -->
+<pre id="out">start</pre>
+<iframe id="f" style="width:800px;height:2400px;border:0"></iframe>
+<script>
+var out = document.getElementById('out');
+out.textContent = 'script ran';
+var F = document.getElementById('f');
+var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+window.onerror = function (m, f, l) { out.textContent = 'ERR ' + m + ' @' + l; };
+(async function () {
+  F.src = '../index.html' + (new URLSearchParams(location.search).get('as') ? '?as=' + new URLSearchParams(location.search).get('as') : '') + '#/s/' + (new URLSearchParams(location.search).get('s') || '544-95');
+  var D = null;
+  for (var i = 0; i < 150; i++) { D = F.contentDocument; if (D && D.querySelector('.screen')) break; await sleep(60); }
+  await sleep(500);
+  var Wn = F.contentWindow;
+  var lines = [];
+  var scr = D.querySelector('.screen');
+  lines.push('screen: class="' + scr.className + '" w=' + Math.round(scr.getBoundingClientRect().width));
+  ((new URLSearchParams(location.search).get('n')||'Body').split('|')).forEach(function (n) {
+    var el = D.querySelector('[data-name="' + n + '"]');
+    if (!el) { lines.push(n + ': MISSING'); return; }
+    var c = Wn.getComputedStyle(el), r = el.getBoundingClientRect();
+    lines.push('CHAIN for ' + n + '  (screen w=' + Math.round(scr.getBoundingClientRect().width) + ')');
+    var chain = [], q = el;
+    while (q && q !== scr.parentElement) { chain.unshift(q); q = q.parentElement; }
+    chain.forEach(function (x, i) {
+      var xc = Wn.getComputedStyle(x), xr = x.getBoundingClientRect();
+      lines.push('  '.repeat(i) + (x.dataset.name || x.tagName) + ' {' + (x.className || '') + '}' + ' pos=' + xc.position +
+        '  w=' + Math.round(xr.width) + ' right=' + Math.round(xr.right) +
+        ' disp=' + xc.display + ' dir=' + xc.flexDirection + ' wrap=' + xc.flexWrap +
+        ' basis=' + xc.flexBasis + ' grow=' + xc.flexGrow + ' shrink=' + xc.flexShrink +
+        ' items=' + xc.alignItems + ' self=' + xc.alignSelf + ' inlineW=' + (x.style.width || '-') +
+        ' maxW=' + xc.maxWidth + ' ovf=' + xc.overflowX);
+    });
+  });
+  out.textContent = lines.join('\n');
+})();
+</script>

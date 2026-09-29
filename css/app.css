@@ -1,0 +1,121 @@
+:root { --bg: #d6d6d6; --ink: #111111; --muted: #767676; --line: #e3e3e3; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+#stage { width: 100%; display: flex; justify-content: center; }
+
+/* rendered Figma screen */
+.screen { background: #fff; position: relative; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,.06); }
+.screen .is-link { cursor: pointer; }
+.screen .is-link:hover { filter: brightness(0.97); }
+.screen .is-fixed { will-change: top; }
+.screen .editable { cursor: text; outline: none; min-width: 40px; }
+.screen .editable:focus { caret-color: #111; }
+.screen .composer-input:empty::before { content: attr(data-placeholder); color: #8a8a8a; pointer-events: none; }
+.screen .composer-input { cursor: text; }
+.screen .sent-here { animation: pop .18s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.fallback-msg { align-self: flex-end; background: #111; color: #fff; padding: 10px 14px; border-radius: 12px; max-width: 420px; font-size: 14px; }
+
+/* start page */
+.home { width: min(1100px, 100% - 32px); margin: 40px auto 120px; background: #fff; border-radius: 16px; padding: 40px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.home-head { display: flex; gap: 16px; align-items: center; margin-bottom: 32px; }
+.home-logo { width: 48px; height: 48px; border-radius: 10px; background: #f2f2f2; display: grid; place-items: center; color: #8a8a8a; font-size: 22px; }
+.home h1 { margin: 0; font-size: 28px; }
+.home p { margin: 4px 0 0; color: #555; font-size: 15px; }
+.home h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 28px 0 12px; }
+.flow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.flow { display: grid; grid-template-columns: 36px 1fr; grid-template-rows: auto auto; gap: 4px 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color .15s, transform .15s; }
+.flow:hover { border-color: #111; transform: translateY(-1px); }
+.flow-num { grid-row: span 2; width: 32px; height: 32px; border-radius: 16px; background: #111; color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 600; }
+.flow-name { font-size: 15px; font-weight: 600; line-height: 1.4; }
+.flow-go { font-size: 13px; color: var(--muted); }
+.all-screens { margin-top: 32px; border-top: 1px solid var(--line); padding-top: 20px; }
+.all-screens summary { cursor: pointer; font-weight: 600; }
+.all-screens h3 { font-size: 13px; color: var(--muted); margin: 20px 0 6px; }
+.all-screens ul { margin: 0; padding-left: 18px; columns: 2; font-size: 14px; line-height: 1.8; }
+.all-screens a { color: #111; }
+.home-foot { margin-top: 28px; font-size: 13px; color: var(--muted); }
+.app-msg { margin: 80px auto; background: #fff; padding: 24px 32px; border-radius: 12px; }
+
+/* toolbar (bottom-left, clear of Netlify's bottom-right badge) */
+.toolbar { position: fixed; left: 16px; bottom: 16px; z-index: 1000; display: flex; align-items: center; gap: 8px; background: #111; color: #fff; padding: 6px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.25); font-size: 13px; max-width: calc(100vw - 32px); }
+.tb-btn { background: #2a2a2a; color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; font: 600 13px Inter, sans-serif; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.tb-btn:hover { background: #3a3a3a; }
+.tb-name { padding: 0 8px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
+@media (max-width: 700px) { .tb-name { display: none; } .all-screens ul { columns: 1; } .home { padding: 24px; } }
+
+/* ---- interactive app ---- */
+.screen .is-action { cursor: pointer; }
+.screen .is-action:hover { filter: brightness(0.96); }
+.editable.with-placeholder:empty::before { content: attr(data-placeholder); color: #8a8a8a; pointer-events: none; }
+.editable { caret-color: #111; }
+.empty-note { padding: 28px 20px; color: #767676; font: 14px/1.5 Inter, sans-serif; text-align: center; }
+.demo-hint { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: #f4f4f4; border: 1px dashed #c4c4c4; color: #555; font: 12px/1.5 Inter, sans-serif; }
+.otp-input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; font-size: 16px; cursor: text; }
+
+/* overlays */
+body.has-overlay { overflow: hidden; }
+.overlay { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; overflow: auto; padding: 24px 0; }
+.overlay-scrim { position: fixed; inset: 0; background: rgba(0,0,0,.45); animation: fade .15s ease-out; }
+.overlay-box { position: relative; animation: rise .18s ease-out; margin: auto; }
+.overlay.is-anchored { display: block; }
+.overlay.is-anchored .overlay-scrim { background: transparent; }
+.overlay.is-anchored .overlay-box { position: fixed; margin: 0; }
+@keyframes fade { from { opacity: 0 } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px) } }
+.suggest-pop { box-shadow: 0 10px 28px rgba(0,0,0,.14); }
+
+/* mini modal (add product) */
+.mini-modal { width: 520px; background: #fff; border-radius: 16px; padding: 28px; box-shadow: 0 16px 40px rgba(0,0,0,.2); font-family: Inter, sans-serif; }
+.mini-modal h3 { margin: 0 0 6px; font-size: 20px; } .mini-modal p { margin: 0 0 16px; color: #555; font-size: 14px; line-height: 1.5; }
+.mm-field { position: relative; } .mm-input { border: 1.5px solid #111; border-radius: 8px; padding: 12px 14px; font-size: 15px; outline: none; min-height: 46px; }
+.mm-foot { display: flex; justify-content: flex-end; margin-top: 20px; } .mm-btn { border: 1px solid #c4c4c4; background: #fff; border-radius: 8px; padding: 10px 18px; font: 600 14px Inter, sans-serif; cursor: pointer; }
+
+/* toast */
+.toast { position: fixed; left: 50%; bottom: 84px; transform: translate(-50%, 20px); opacity: 0; z-index: 1200; background: #111; color: #fff; border-radius: 10px; padding: 12px 16px; display: flex; gap: 16px; align-items: center; font: 500 14px Inter, sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,.25); transition: all .2s ease-out; max-width: calc(100vw - 32px); }
+.toast.in { opacity: 1; transform: translate(-50%, 0); }
+.toast button { background: none; border: 0; color: #fff; font: 600 14px Inter, sans-serif; text-decoration: underline; cursor: pointer; }
+
+/* The role tabs now live in the flow sidebar — see css/flownav.css. */
+
+.is-hidden { display: none !important; }
+
+/* My enQ split view: enquiry facts strip + ··· menu in the chat header */
+.enq-meta { display: flex; align-self: stretch; width: 100%; align-items: center; gap: 12px; padding: 10px 20px; background: #fafafa; border-bottom: 1px solid #ededed; font: 13px/1.5 Inter, sans-serif; color: #555; }
+.enq-meta-line { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.enq-meta-line strong { color: #111; font-weight: 600; }
+.enq-meta-pill { flex: 0 0 auto; background: #ededed; color: #333; border-radius: 12px; padding: 3px 10px; font: 600 11px Inter, sans-serif; }
+.enq-meta-pill.on { background: #111; color: #fff; }
+/* on a phone the facts wrap onto their own line rather than truncating,
+   so the enquiry is still readable next to the status */
+@media (max-width: 759px) {
+  .enq-meta { flex-wrap: wrap; row-gap: 6px; padding: 10px 16px; }
+  .enq-meta-line { flex: 1 1 100%; white-space: normal; overflow: visible; }
+}
+.more-btn { position: relative; flex: 0 0 auto; width: 36px; height: 36px; border: 1px solid #e0e0e0; border-radius: 18px; background: #fff; display: grid; place-items: center; font: 600 16px Inter, sans-serif; color: #333; cursor: pointer; }
+.more-btn:hover { background: #f5f5f5; }
+.more-menu { position: absolute; top: 44px; right: 0; z-index: 60; min-width: 220px; background: #fff; border: 1px solid #e3e3e3; border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.16); padding: 6px; display: flex; flex-direction: column; cursor: default; }
+.more-menu button { text-align: left; border: 0; background: none; padding: 10px 12px; border-radius: 8px; font: 500 14px Inter, sans-serif; color: #111; cursor: pointer; }
+.more-menu button:hover:not(:disabled) { background: #f4f4f4; }
+.more-menu button:disabled { color: #8a8a8a; cursor: default; }
+
+/* the "every screen" index */
+.index-page { width: min(1200px, 100% - 32px); margin: 32px auto 140px; background: #fff; border-radius: 16px; padding: 40px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.index-page h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -.01em; }
+.index-page header p { margin: 0 0 8px; color: #555; font-size: 15px; max-width: 62ch; line-height: 1.6; }
+.index-page h2 { display: flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 36px 0 14px; border-top: 1px solid var(--line); padding-top: 20px; }
+.ix-count { font-size: 11px; letter-spacing: 0; background: #f2f2f2; color: #555; border-radius: 10px; padding: 2px 8px; }
+.ix-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.ix-card { display: grid; gap: 3px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; color: inherit; background: #fff; min-height: 76px; align-content: center; }
+.ix-card:hover { border-color: #111; }
+.ix-code { font: 600 12px/1.3 Inter, sans-serif; color: var(--muted); letter-spacing: .04em; }
+.ix-name { font: 500 14px/1.4 Inter, sans-serif; }
+.ix-size { font: 400 11px/1.3 Inter, sans-serif; color: #9a9aa2; }
+@media (max-width: 759px) { .index-page { padding: 24px 18px; margin: 16px auto 140px; } .index-page h1 { font-size: 24px; } }
+
+/* All Categories: the subcategory grid is the scrolling region of the panel.
+   The renderer only clips a frame that is FIXED on both axes, and this one fills
+   the space left between the panel head and its footer, so say it explicitly. */
+.screen [data-name="Subcategory grid"] { overflow-y: auto; overscroll-behavior: contain; }
+.screen [data-name="Subcategory grid"]::-webkit-scrollbar { width: 8px; }
+.screen [data-name="Subcategory grid"]::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 4px; }

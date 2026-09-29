@@ -1,0 +1,86 @@
+<!doctype html><meta charset="utf-8"><title>apptest</title><pre id="out">running</pre>
+<iframe id="f" style="width:1440px;height:900px"></iframe>
+<script>
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)); const res={}; const log=[];
+const F=document.getElementById('f'); const W=()=>F.contentWindow, D=()=>F.contentDocument;
+const q=(sel)=>D().querySelector(sel); const qa=sel=>[...D().querySelectorAll(sel)];
+const byName=n=>D().querySelector('[data-name="'+n+'"]');
+async function until(fn,t=6000){const s=Date.now();while(Date.now()-s<t){try{const v=fn();if(v)return v;}catch(e){}await sleep(80);}return null;}
+function click(el){ el.dispatchEvent(new (W().MouseEvent)('click',{bubbles:true,cancelable:true})); }
+function type(el,v){ el.textContent=v; el.dispatchEvent(new (W().Event)('input',{bubbles:true})); }
+async function go(h){ W().location.hash=h; await sleep(900); }
+(async()=>{
+  localStorage.clear(); sessionStorage.clear();
+  F.src='../index.html#/'; await until(()=>D() && D().querySelector('.screen'));
+  res.guestHome=D().title;
+  // switch to buyer
+  click(await until(()=>D().querySelector('.rolebar [data-role="buyer"]'))); await sleep(900);
+  res.buyerHome=D().title;
+  await go('#/find'); await until(()=>qa('[data-seller-id]').length);
+  res.findRows=qa('[data-name="Seller list"] > [data-seller-id]').length;
+  // search
+  const s=q('[data-name="Search bar"] .editable'); type(s,'cardamom'); click(byName('Btn / Search')); await sleep(400);
+  res.cardamomRows=qa('[data-name="Seller list"] > [data-seller-id]').map(r=>r.dataset.sellerId);
+  type(s,''); click(byName('Btn / Search')); await sleep(400);
+  // send enquiry to Annapurna
+  const row=qa('[data-name="Seller list"] > [data-seller-id]').find(r=>r.dataset.sellerId==='annapurna');
+  click(row.querySelector('[data-name="Btn / Send enquiry"]'));
+  const modal=await until(()=>D().querySelector('.overlay [data-name="Modal / Send enquiry"]'));
+  res.modal=!!modal;
+  const eds=[...modal.querySelectorAll('.editable')];
+  type(eds[0],'Turmeric Powder, Curcumin ≥5%'); await sleep(500);
+  const sug=D().querySelector('.suggest-pop'); res.suggestions=sug?sug.querySelectorAll('[data-name^="Suggestion /"]').length:0;
+  if(sug) click(sug.querySelector('[data-name^="Suggestion /"]'));
+  await sleep(700);
+  const m2=D().querySelector('.overlay [data-name="Modal / Send enquiry"]'); const e2=[...m2.querySelectorAll('.editable')];
+  type(e2[1],'3'); type(e2[2],'Need COA');
+  res.similarRows=m2.querySelectorAll('[data-name="Seller rows"] > *').length;
+  click(m2.querySelector('[data-name="Button / Send enquiry"]')); await sleep(1300);
+  res.afterSend=W().location.hash+' | '+D().title;
+  const convId=W().location.hash.split('/').pop();
+  res.buyerCard=(q('[data-name="Messages"]')||{}).innerText?.replace(/\s+/g,' ').slice(0,160);
+  // switch to seller
+  click(q('.rolebar [data-role="seller"]')); await sleep(1100);
+  await go('#/myenq'); await sleep(400);
+  res.sellerRows=qa('[data-conv]').slice(0,3).map(r=>r.innerText.replace(/\s+/g,' ').slice(0,70));
+  // Annapurna isn't the seller demo account (Ashwin) — so send one to Ashwin as buyer next
+  click(q('.rolebar [data-role="buyer"]')); await sleep(900);
+  await go('#/seller/ashwin'); await sleep(300);
+  click(q('[data-name="Profile card"] [data-name="Btn / Send enquiry"]'));
+  const m3=await until(()=>D().querySelector('.overlay [data-name="Modal / Send enquiry"]'));
+  const e3=[...m3.querySelectorAll('.editable')]; type(e3[0],'Cardamom 8mm — Green, bold'); e3[0].dispatchEvent(new (W().KeyboardEvent)('keydown',{key:'Enter',bubbles:true})); await sleep(700);
+  const m4=D().querySelector('.overlay [data-name="Modal / Send enquiry"]'); const e4=[...m4.querySelectorAll('.editable')]; type(e4[1],'200'); 
+  click(m4.querySelector('[data-name="Button / Send enquiry"]')); await sleep(1200);
+  const cid=W().location.hash.split('/').pop(); res.ashwinConv=cid;
+  click(q('.rolebar [data-role="seller"]')); await sleep(900);
+  await go('#/myenq/'+cid); await sleep(500);
+  res.sellerRequestScreen=D().title+' | bar:'+!!byName('Chat request bar');
+  click(byName('Chat request bar').querySelector('[data-name="Button / Accept"]')); await sleep(1300);
+  res.afterAccept=!!byName('Composer')+' | meta:'+(q('.enq-meta')||{}).innerText?.replace(/\s+/g,' ').slice(0,90)+' | cols:'+qa('[data-name="Panes"] > *').length;
+  const inp=q('[data-name="Composer"] .composer-input'); type(inp,'Yes — 200 kg available, ₹2,900/kg.');
+  inp.dispatchEvent(new (W().KeyboardEvent)('keydown',{key:'Enter',bubbles:true})); await sleep(1200);
+  res.sellerMsgs=qa('[data-name="Messages"] > *').length;
+  click(q('.rolebar [data-role="buyer"]')); await sleep(900);
+  await go('#/myenq/'+cid); await sleep(700);
+  res.buyerSeesReply=(q('[data-name="Messages"]')||{}).innerText?.includes('200 kg available');
+  // close with reason
+  click(q('.more-btn')); await sleep(300); click([...qa('.more-menu button')].find(b=>/Close enquiry/.test(b.textContent)));
+  const rm=await until(()=>D().querySelector('.overlay [data-name="Modal / Close this enquiry?"]'));
+  click(rm.querySelector('[data-name^="Reason / Found another seller"] [data-name="line"]')); await sleep(200);
+  click(rm.querySelector('[data-name="Button / Close enquiry"]')); await sleep(1300);
+  res.closed=!!byName('Closed bar (read-only)')+' | '+(byName('Closed bar (read-only)')||{}).innerText?.replace(/\s+/g,' ').slice(0,100);
+  // post a requirement
+  await go('#/find'); click(byName('Button / Post a requirement')); const pm=await until(()=>D().querySelector('.overlay [data-name="Modal / Post a requirement"]'));
+  type(pm.querySelector('.editable'),'turmeric'); await sleep(600); const sp=D().querySelector('.suggest-pop'); click(sp.querySelector('[data-name^="Suggestion /"]')); await sleep(800);
+  const pm2=D().querySelector('.overlay [data-name="Modal / Post a requirement"]'); type([...pm2.querySelectorAll('.editable')][1],'2');
+  click(pm2.querySelector('[data-name="Button / Post requirement"]')); await sleep(900);
+  res.posted=(D().querySelector('.overlay [data-name="Modal / Requirement posted"]')||{}).innerText?.replace(/\s+/g,' ').slice(0,120);
+  // seller sees requirement
+  click(q('.rolebar [data-role="seller"]')); await sleep(900); await go('#/myenq'); await sleep(400);
+  res.sellerHasRequirement=qa('[data-conv]').some(r=>/Requirement/.test(r.innerText));
+  // login flow
+  click(q('.rolebar [data-role="guest"]')); await sleep(800); await go('#/login'); await sleep(300);
+  res.loginScreen=D().title;
+  document.getElementById('out').textContent='RESULT '+JSON.stringify(res);
+})().catch(e=>document.getElementById('out').textContent='ERROR '+e.message+' @ '+(e.stack||'').split('\n')[1]+' PARTIAL '+JSON.stringify(res));
+</script>

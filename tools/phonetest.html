@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>phonetest</title>
+<!-- Phone-only behaviour: the My enQ pane switch, the hamburger and the nav drawer.
+     Open through the local server; it renders the app in a 390px iframe. -->
+<pre id="out">start</pre><iframe id="f" style="width:390px;height:1400px;border:0"></iframe>
+<script>
+var out=document.getElementById('out'), F=document.getElementById('f');
+var sleep=ms=>new Promise(r=>setTimeout(r,ms));
+window.onerror=(m,f,l)=>{out.textContent='ERR '+m+' @'+l;};
+window.onunhandledrejection=e=>{out.textContent='REJ '+((e.reason&&e.reason.stack)||e.reason);};
+(async function(){
+  F.src='../index.html?as=buyer#/myenq';
+  var D=null; for(var i=0;i<150;i++){D=F.contentDocument; if(D&&D.querySelector('.screen'))break; await sleep(60);} await sleep(600);
+  var W=F.contentWindow, r=[];
+  if(!D||!D.querySelector('.screen')){out.textContent='iframe never rendered';return;}
+  var sw=D.querySelector('.pane-switch');
+  r.push('pane switch: '+(sw?[...sw.querySelectorAll('button')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')).join(' / '):'MISSING'));
+  r.push('thread visible: '+(D.querySelector('[data-name^="Pane / Thread"]').offsetParent!==null));
+  sw.querySelectorAll('button')[0].click(); await sleep(250);
+  r.push('after All chats → list visible: '+(D.querySelector('[data-name="Pane / My enQ"]').offsetParent!==null)+', thread hidden: '+(D.querySelector('[data-name^="Pane / Thread"]').offsetParent===null));
+  var h=D.querySelector('.hamburger');
+  r.push('hamburger: '+(h?getComputedStyle(h).display:'MISSING'));
+  h.click(); await sleep(350);
+  var dr=D.defaultView.document.querySelector('.navdrawer.open')||W.document.querySelector('.navdrawer.open');
+  r.push('drawer open: '+!!dr+' items: '+(dr?dr.querySelectorAll('.navdrawer-panel button').length:0));
+  if(dr){ dr.querySelector('.navdrawer-scrim').click(); await sleep(250); r.push('drawer closed: '+!W.document.querySelector('.navdrawer.open')); }
+  r.push('mode attr: '+W.document.documentElement.dataset.mode);
+  out.textContent=r.join('\n');
+})();
+</script>
