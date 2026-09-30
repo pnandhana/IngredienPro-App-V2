@@ -1,7 +1,10 @@
 /* Log in and Register Free — real inputs on top of the Figma screens.
-   Demo rules (shown in a hint on the code screens):
-   code ending 000 = wrong code, ending 111 = expired, anything else = correct.
-   Log in with a number starting 98450 → Seller Hub; any other number → buyer. */
+   Verification is skipped in this prototype: the code screens are dummies and
+   Verify / Log in always succeed. What you type on the registration form (name,
+   company, WhatsApp number, email, business type, categories, delivery city) is
+   what the account, header, Overview and Profile & Settings show.
+   Log in with a registered seller's number, or one starting 98450 → Seller Hub;
+   any other number → buyer. */
 const Auth = (function () {
   const SS = 'ingredienpro.auth';
   const get = () => { try { return JSON.parse(sessionStorage.getItem(SS)) || {}; } catch (e) { return {}; } };
@@ -40,13 +43,15 @@ const Auth = (function () {
       $.set(card, /^We sent a 6-digit code/, `We sent a 6-digit code ${s.channel === 'email' ? 'to ' + s.email : 'on WhatsApp to +91 ' + (s.phone || '98470 12345')}.`);
       let code = '';
       const i = otp(card.querySelector('[data-name="OTP boxes"]'), v => code = v); if (i) setTimeout(() => i.focus(), 50);
+      /* verification is skipped in this prototype: Log in works with or without a code */
       $.on(card.querySelector('[data-name="Btn / Log in"]'), () => {
-        if (code.length < 6) return App.toast('Enter the 6-digit code');
-        if (outcome(code) !== 'correct') return App.toast(outcome(code) === 'wrong' ? 'That code isn’t right. Check the latest message and try again.' : 'That code has expired. We’ve sent a new one.');
-        const role = /^98450/.test((s.phone || '').replace(/\s/g, '')) ? 'seller' : 'buyer';
-        Store.login(role); App.toast('Welcome back, ' + Store.db.accounts[role].company); App.go(role === 'seller' ? '/hub' : '/');
+        const digits = (s.phone || '').replace(/\D/g, '');
+        const sellerAcc = Object.values(Store.db.sellerAccounts).find(a => a.phone && a.phone.replace(/\D/g, '') === digits);
+        if (sellerAcc) Store.setSellerIdentity(sellerAcc.id);
+        const role = sellerAcc || /^98450/.test(digits) ? 'seller' : 'buyer';
+        Store.login(role); App.toast('Welcome back, ' + Store.db.accounts[role].company); App.go(role === 'seller' ? '/hub' : '/overview');
       });
-      hint(card, 'Demo: any 6 digits log you in. Codes ending 000 are wrong, 111 are expired.');
+      hint(card, 'Demo: verification is skipped — press Log in. A seller’s number opens their Seller Hub.');
     }
   }
 
@@ -82,16 +87,34 @@ const Auth = (function () {
       const f = s[kind] || {}; $.texts(card).forEach(t => { if (/^\+91 \d/.test(t.textContent.trim()) && f.phone) t.textContent = '+91 ' + f.phone; if (/@/.test(t.textContent) && t.textContent.trim().split(' ').length === 1 && f.email) t.textContent = f.email; });
       const codes = {}; card.querySelectorAll('[data-name="Boxes"], [data-name="OTP boxes"]').forEach((b, i) => { if (step === 'correct' || step === 'verify') return; otp(b, v => codes[i] = v); });
       const next = card.querySelector('[data-name="Button / Verify and continue"]');
-      $.on(next, () => { const vals = Object.values(codes); if (vals.length < 1 || vals.some(v => v.length < 6)) return App.toast('Enter both 6-digit codes'); const bad = vals.map(outcome).find(o => o !== 'correct'); App.go(base + (bad || 'correct')); });
+      /* verification is skipped: Verify always succeeds, codes or not */
+      $.on(next, () => App.go(base + 'correct'));
       const cont = card.querySelector('[data-name="Button / Continue"]'); $.on(cont, () => App.go(base + (kind === 'buyer' ? 'prefs' : 'docs')));
-      if (step !== 'correct' && step !== 'verify') hint(card, 'Demo: codes ending 000 are wrong, 111 are expired, anything else is correct.');
+      if (step !== 'correct' && step !== 'verify') hint(card, 'Demo: verification is skipped — press Verify and continue.');
       return;
     }
     if (step === 'prefs') {
-      card.querySelectorAll('[data-name^="Chip / "]').forEach(ch => $.on(ch, () => { const on = ch.dataset.on !== '1'; ch.dataset.on = on ? '1' : '0'; ch.style.background = on ? '#111111' : '#ffffff'; $.texts(ch).forEach(t => t.style.color = on ? '#ffffff' : '#111111'); }));
-      const done = to => { const f = get().buyer || {}; Store.registerBuyer({ name: f.name || 'New buyer', company: f.company || 'New Buyer Co', phone: f.phone, email: f.email }); App.toast('Your buyer account is ready'); App.go(to); };
+      const f0 = get().buyer || {};
+      $.set(card, /^Welcome,/, 'Welcome, ' + ((f0.name || '').split(/\s+/)[0] || 'there'));
+      /* category chips start as drawn (the dark ones are selected) and toggle */
+      const chips = [...card.querySelectorAll('[data-name^="Chip / "]')];
+      const count = $.text(card, /^\d+ selected$/);
+      const paintChip = ch => { const on = ch.dataset.on === '1'; ch.style.background = on ? '#111111' : '#ffffff'; $.texts(ch).forEach(t => t.style.color = on ? '#ffffff' : '#111111'); };
+      const recount = () => { if (count) count.textContent = chips.filter(c => c.dataset.on === '1').length + ' selected'; };
+      chips.forEach(ch => { const bg = getComputedStyle(ch).backgroundColor; ch.dataset.on = /rgb\(17, 17, 17\)/.test(bg) ? '1' : '0'; $.on(ch, () => { ch.dataset.on = ch.dataset.on === '1' ? '0' : '1'; paintChip(ch); recount(); }); });
+      recount();
+      /* delivery city and country are typeable */
+      const loc = {};
+      ['Country', 'City'].forEach(k => { const fl = card.querySelector(`[data-name="Field / ${k}"]`); const inp = fl && (fl.querySelector('[data-name="Input"]') || fl.querySelector('[data-name="Select"]')); if (!inp) return; const sample = ($.texts(inp).filter(x => x.textContent.trim().length > 1).pop() || {}).textContent || ''; loc[k] = sample.replace(/\s*▾\s*$/, '').trim(); Modals.field(inp, loc[k], v => loc[k] = v.trim()); });
+      const done = (to, skip) => {
+        const f = get().buyer || {};
+        const interests = skip ? [] : chips.filter(c => c.dataset.on === '1').map(c => $.texts(c).map(t => t.textContent.trim()).sort((a, b) => b.length - a.length)[0] || '').filter(Boolean);   // the label, not the ✓ tick
+        const locations = skip || !loc.City ? [] : [loc.City + (loc.Country ? ', ' + loc.Country : '')];
+        Store.registerBuyer({ name: f.name || 'New buyer', company: f.company || 'New Buyer Co', phone: f.phone, email: f.email, city: loc.City || '', interests, locations });
+        App.toast('Your buyer account is ready'); App.go(to);
+      };
       $.on(card.querySelector('[data-name="Button / Start sourcing"]'), () => done('/find'));
-      card.querySelectorAll('[data-name="Button / Skip for now"], [data-name="Skip for now"]').forEach(b => $.on(b, () => done('/')));
+      card.querySelectorAll('[data-name="Button / Skip for now"], [data-name="Skip for now"]').forEach(b => $.on(b, () => done('/overview', true)));
       return;
     }
     // seller onboarding

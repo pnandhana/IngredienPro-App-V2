@@ -80,7 +80,8 @@ const Modals = (function () {
       setHelper();
       // product this seller doesn't list → prompt
       if (p.name && p.checked !== false && !Store.sellsProduct(s, p.name) && st.products.length > 0) { p.blocked = true; st.pending.push(notSold(pf, p, i)); }
-      const q = root.querySelector('[data-name="Field / Quantity *"]'); field(q && (q.querySelector('[data-name="Input"]') || q.children[1]), p.qty, v => p.qty = v.trim(), { placeholder: 'e.g. 2' });
+      /* in a multi-product enquiry, Enter in Quantity finishes this product */
+      const q = root.querySelector('[data-name="Field / Quantity *"]'); field(q && (q.querySelector('[data-name="Input"]') || q.children[1]), p.qty, v => p.qty = v.trim(), { placeholder: 'e.g. 2', onEnter: st.products.length > 1 ? () => finish(p, root) : null });
       const u = root.querySelector('[data-name="Field / Unit *"]'); unitPicker(u && (u.querySelector('[data-name="Select"]') || u.children[1]), p.unit, v => { p.unit = v; draw(); });
       const n = root.querySelector('[data-name="Field / Notes to the seller"]'); field(n && n.querySelector('[data-name="Textarea"]'), p.notes, v => p.notes = v, { placeholder: 'Specs, packaging, documents you need…' });
     }
@@ -95,7 +96,16 @@ const Modals = (function () {
     }
     function singleProduct(body) {
       const p = st.products[0]; p.blocked = false; productFields(body, p, 0);
-      $.on(body.querySelector('[data-name="Button / + Add another product"]'), () => { if (!validate(p)) return; p.open = false; st.products.push({ name: '', qty: '', unit: p.unit, notes: '', open: true }); draw(); });
+      $.on(body.querySelector('[data-name="Button / + Add another product"]'), () => { if (!validate(p, body)) return; p.open = false; st.products.push({ name: '', qty: '', unit: p.unit, notes: '', open: true }); draw(); });
+    }
+    /* A product box is finished when it has a product and a quantity. Finishing
+       collapses it to its one-line summary; a box left completely blank is just
+       dropped, so it never blocks moving on. */
+    const blank = p => !p.name.trim() && !String(p.qty).trim();
+    function finish(p, root) {
+      if (blank(p) && st.products.length > 1) { st.products.splice(st.products.indexOf(p), 1); draw(); return true; }
+      if (!validate(p, root)) return false;
+      p.open = false; draw(); return true;
     }
     function multiProducts(body) {
       const list = body.querySelector('[data-name="Products"]'); const head = list.querySelector('[data-name="head"]');
@@ -106,19 +116,28 @@ const Modals = (function () {
         p.blocked = false;
         if (!p.open) {
           const r = $.clone(colT); const ts = $.texts(r); ts[0].textContent = String(i + 1); ts[1].textContent = p.name; ts[2].textContent = `${p.qty} ${p.unit}${p.notes ? '  ·  ' + p.notes : ''}`;
-          $.on($.text(r, 'Edit'), () => { st.products.forEach(x => x.open = false); p.open = true; draw(); });
-          $.on($.text(r, 'Remove'), () => { st.products.splice(i, 1); if (!st.products.some(x => x.open)) st.products[st.products.length - 1].open = true; draw(); });
+          /* the whole summary line opens it for editing; the one being edited closes
+             first (and is dropped if it was left blank) */
+          const edit = () => { const cur = st.products.find(x => x.open && x !== p); if (cur) { const curEl = list.querySelector('.is-open-product'); if (blank(cur)) { st.products.splice(st.products.indexOf(cur), 1); } else if (!validate(cur, curEl)) return; else cur.open = false; } p.open = true; draw(); };
+          r.classList.add('product-summary'); r.title = 'Edit this product';
+          $.on(r, edit); $.on($.text(r, 'Edit'), edit);
+          $.on($.text(r, 'Remove'), () => { st.products.splice(i, 1); draw(); });
           list.insertBefore(r, addRow);
         } else {
-          const r = $.clone(openT); const ts = $.texts(r.querySelector('[data-name="head"]')); ts[0].textContent = String(i + 1); ts[1].textContent = i === 0 ? 'First product' : ['Second', 'Third', 'Fourth', 'Fifth'][i - 1] + ' product';
-          $.on($.text(r.querySelector('[data-name="head"]'), 'Remove'), () => { st.products.splice(i, 1); st.products[st.products.length - 1].open = true; draw(); });
+          const r = $.clone(openT); r.classList.add('is-open-product');
+          const hd = r.querySelector('[data-name="head"]'); const ts = $.texts(hd); ts[0].textContent = String(i + 1); ts[1].textContent = i === 0 ? 'First product' : ['Second', 'Third', 'Fourth', 'Fifth'][i - 1] + ' product';
+          const rm = $.text(hd, 'Remove');
+          /* Done: finish this product and collapse it */
+          const done = $.clone(rm); done.textContent = 'Done'; done.dataset.name = 'Link / Done'; done.classList.add('product-done'); rm.before(done);
+          $.on(done, () => finish(p, r));
+          $.on(rm, () => { st.products.splice(i, 1); draw(); });
           list.insertBefore(r, addRow); productFields(r, p, i);
         }
       });
       const cnt = $.texts(addRow).find(x => /of 5 products/.test(x.textContent)); if (cnt) cnt.textContent = `${st.products.length} of 5 products`;
       const add = addRow.querySelector('[data-name="Button / + Add another product"]');
       if (st.products.length >= 5) add.style.opacity = 0.4;
-      $.on(add, () => { const cur = st.products.find(x => x.open); if (cur && !validate(cur)) return; if (st.products.length >= 5) return; st.products.forEach(x => x.open = false); st.products.push({ name: '', qty: '', unit: cur ? cur.unit : 'MT', notes: '', open: true }); draw(); });
+      $.on(add, () => { const cur = st.products.find(x => x.open); if (cur && !validate(cur, list.querySelector('.is-open-product'))) return; if (st.products.length >= 5) return; st.products.forEach(x => x.open = false); st.products.push({ name: '', qty: '', unit: cur ? cur.unit : 'MT', notes: '', open: true }); draw(); });
     }
     async function similar(body) {
       const sim = body.querySelector('[data-name="Similar sellers"]'); if (!sim) return;
@@ -141,7 +160,11 @@ const Modals = (function () {
         const r = $.clone(tpl); const ts = $.texts(r); const av = r.querySelector('[data-name="avatar"], [data-name="Avatar"]');
         const nm = ts.find(t => t.textContent.trim().length > 3 && !/years active|Sells/.test(t.textContent)); if (nm) nm.textContent = c.name;
         const sub = ts.find(t => /years active/.test(t.textContent)); if (sub) sub.textContent = `${c.city}, ${c.state} · ${c.years} years active`;
-        const ini = ts.find(t => t.textContent.trim().length === 1 && t !== nm); if (ini) ini.textContent = c.initial;
+        /* the initial (or logo) goes in the avatar — not the first one-letter text,
+           which is the checkbox's ✓ */
+        const cbx = r.querySelector('[data-name="Checkbox"]');
+        const avEl = av || ts.map(t => t.parentElement).find(p => p !== r && !(cbx && cbx.contains(p)) && $.texts(p).length === 1 && $.texts(p)[0].textContent.trim().length === 1);
+        if (avEl) Photo.paint(avEl, Store.photo('seller:' + c.id), c.initial);
         const pill = r.querySelector('[data-name="Pill / Sells both"]'); if (pill && ready.length < 2) pill.remove(); else if (pill && ready.length > 2) $.texts(pill)[0].textContent = 'Sells all';
         const box = r.querySelector('[data-name="Checkbox"]') || r.children[0]; paintCb(box, st.picked.has(c.id));
         $.on(r, () => { st.picked.has(c.id) ? st.picked.delete(c.id) : st.picked.add(c.id); paintCb(box, st.picked.has(c.id)); counts(); });
@@ -159,17 +182,41 @@ const Modals = (function () {
       const extra = st.similarOn ? st.picked ? st.picked.size : 0 : 0; const n = 1 + extra; const blocked = st.products.some(p => p.blocked);
       const t = $.texts(f)[0];
       if (blocked) t.textContent = 'Remove the product this seller doesn’t sell, or send it as a new enquiry';
-      else t.textContent = st.products.length > 1 ? `${st.products.length} products · ${n} seller${n > 1 ? 's' : ''} · one chat per seller in My enQ` : `${n} enquir${n > 1 ? 'ies' : 'y'} · each appears as its own chat in My enQ`;
+      else {
+        /* a second enquiry to the same seller joins the chat you already have with them */
+        const existing = Store.pairConv(Store.db.accounts.buyer.id, s.id);
+        t.textContent = (st.products.length > 1 ? `${st.products.length} products · ` : '')
+          + (existing ? `Adds a new enquiry to your chat with ${s.name}` + (n > 1 ? ` · +${n - 1} similar seller${n > 2 ? 's' : ''}` : '')
+                      : `${n} seller${n > 1 ? 's' : ''} · one chat per seller in My enQ`);
+      }
       const send = f.querySelector('[data-name="Button / Send enquiry"]'); send.style.opacity = blocked ? 0.4 : 1;
-      $.on(send, () => { const c = submit(); if (c) { App.toast(`Enquiry sent to ${s.name}${st.similarOn && st.picked && st.picked.size ? ' + ' + st.picked.size + ' similar seller' + (st.picked.size > 1 ? 's' : '') : ''}`); App.go('/myenq/' + c.id); } });
+      /* footer() runs again whenever the similar-seller count changes; wire the
+         buttons once, or every run adds another handler and Send submits twice */
+      if (f.dataset.wired) return; f.dataset.wired = '1';
+      $.on(send, () => { const c = submit(); if (c) { App.toast(`Enquiry sent to ${s.name}${st.similarOn && st.picked && st.picked.size ? ' + ' + st.picked.size + ' similar seller' + (st.picked.size > 1 ? 's' : '') : ''}`); App.go('/myenq/' + c.id + '?enq=' + c.lastEnq); } });
       $.on(f.querySelector('[data-name="Button / Cancel"]'), () => App.closeOverlay());
     }
-    function validate(p) { if (!p.name.trim()) { App.toast('Add a product first'); return false; } if (!String(p.qty).trim()) { App.toast('Add a quantity for ' + p.name.split(',')[0]); return false; } return true; }
+    /* Missing product or quantity: say so inside the field when we can see it,
+       otherwise in a toast. */
+    function validate(p, root) {
+      const miss = !p.name.trim() ? ['Field / Product or commodity *', 'Pick or type a product'] : !String(p.qty).trim() ? ['Field / Quantity *', 'Add a quantity' + (p.name ? ' for ' + p.name.split(/[,—(]/)[0].trim() : '')] : null;
+      if (!miss) return true;
+      const fld = root && root.querySelector(`[data-name="${miss[0]}"]`);
+      if (fld) {
+        fld.querySelectorAll('.field-err').forEach(x => x.remove());
+        const e = document.createElement('div'); e.className = 'field-err'; e.setAttribute('role', 'alert'); e.textContent = miss[1]; fld.appendChild(e);
+        const inp = fld.querySelector('.editable'); if (inp) { inp.focus(); inp.addEventListener('input', () => e.remove(), { once: true }); }
+      } else App.toast(miss[1]);
+      return false;
+    }
     function payload(list) { return list.map(p => ({ name: p.name.trim(), qty: String(p.qty).trim(), unit: p.unit, notes: p.notes.trim(), category: p.category || categoryOf(p.name) })); }
     function submit(list) {
+      /* a product box left completely blank is ignored rather than blocking Send */
+      if (!list && st.products.length > 1) st.products = st.products.filter(p => !blank(p));
       const items = list || st.products;
       if (!list && st.products.some(p => p.blocked)) return App.toast('Resolve the product this seller doesn’t sell first');
-      for (const p of items) if (!validate(p)) return;
+      const modal = document.querySelector('.overlay [data-name="Modal / Send enquiry"]');
+      for (const p of items) if (!validate(p, p.open && modal ? (modal.querySelector('.is-open-product') || modal) : null)) return;
       const products = payload(items);
       const main = Store.sendEnquiry({ sellerIds: [s.id], products, type: 'direct' })[0];
       if (st.similarOn && st.picked && st.picked.size) Store.sendEnquiry({ sellerIds: [...st.picked], products, type: 'similar' });
@@ -194,50 +241,17 @@ const Modals = (function () {
     }
   }
 
-  /* ================= Post a requirement ================= */
-  function requirement() {
-    if (Store.db.session.role === 'guest') return gate();
-    const st = { product: '', category: '', qty: '', unit: 'MT', notes: '' };
-    draw();
-    async function draw() {
-      const picked = !!st.category;
-      const m = await App.subtree(picked ? F.B.reqPicked : F.B.req, 'Modal / Post a requirement');
-      m.querySelectorAll('[data-name="Suggestions dropdown"]').forEach(x => x.remove());
-      $.on($.text(m.querySelector('[data-name="Head"]'), '×'), () => App.closeOverlay());
-      const pf = m.querySelector('[data-name="Field / Product or commodity *"]'); const inp = pf.querySelector('[data-name="Input"]');
-      field(inp, st.product, v => { st.product = v; st.category = ''; suggest(inp, v, h => { st.product = h.name; st.category = h.category; draw(); }); }, { placeholder: 'Start typing a product — e.g. turmeric' });
-      const cat = pf.querySelector('[data-name="Detected category"]');
-      if (cat && picked) { const pill = cat.querySelector('[data-name^="Pill /"]'); $.texts(pill)[0].textContent = st.category; $.on($.text(cat, 'Change'), () => { st.category = ''; draw(); }); }
-      const q = m.querySelector('[data-name="Field / Quantity *"]'); field(q && (q.querySelector('[data-name="Input"]') || q.children[1]), st.qty, v => st.qty = v.trim(), { placeholder: 'e.g. 2' });
-      const u = m.querySelector('[data-name="Field / Unit *"]'); unitPicker(u && (u.querySelector('[data-name="Select"]') || u.children[1]), st.unit, v => { st.unit = v; draw(); });
-      const n = m.querySelector('[data-name="Field / Requirement details"]'); field(n && n.querySelector('[data-name="Textarea"]'), st.notes, v => st.notes = v, { placeholder: 'Specs, packaging, delivery location and date…' });
-      const count = picked ? Store.db.sellers.filter(s => s.categories.some(c => c.name === st.category)).length : 0;
-      const who = m.querySelector('[data-name="Who receives this"]');
-      if (who) { const c = who.querySelector('[data-name="count"]'); $.texts(c)[0].textContent = picked ? `${count} sellers` : '— sellers'; const line = $.texts(who).find(t => /receive this|see how many/.test(t.textContent)); if (line) line.textContent = picked ? `verified sellers in ${st.category} will receive this` : 'Pick a product to see how many sellers will receive this'; }
-      const f = m.querySelector('[data-name="Footer"]'); $.texts(f)[0].textContent = picked ? `Sent to ${count} sellers · replies arrive in My enQ` : 'Pick a product to continue';
-      const post = f.querySelector('[data-name="Button / Post requirement"]'); post.style.opacity = picked ? 1 : 0.4;
-      $.on(post, () => { if (!picked) return App.toast('Pick a product from the list first'); if (!st.qty) return App.toast('Add a quantity'); const r = Store.postRequirement({ product: st.product, qty: st.qty, unit: st.unit, notes: st.notes.trim(), category: st.category }); posted(r); });
-      $.on(f.querySelector('[data-name="Button / Cancel"]'), () => App.closeOverlay());
-      const box = App.openOverlay(m); const e = box.querySelector('.editable'); if (e && !st.product) e.focus();
-    }
-    async function posted(r) {
-      const m = await App.subtree(F.B.reqPosted, 'Modal / Requirement posted');
-      $.set(m, /^Sent to \d+ verified sellers/, `Sent to ${r.sellerIds.length} verified sellers in ${r.category}. When a seller accepts, a chat opens in My enQ — usually within a few hours.`);
-      const sum = m.querySelector('[data-name="Summary"]');
-      [...sum.children].forEach(row => { const [k, v] = $.texts(row); const key = k.textContent.trim(); if (key === 'Product') v.textContent = r.product; if (key === 'Quantity') v.textContent = `${r.qty} ${r.unit}`; if (key === 'Category') v.textContent = r.category; if (key === 'Open until') { const d = new Date(Date.now() + 14 * 864e5); v.textContent = d.getDate() + ' ' + d.toLocaleString('en', { month: 'short' }) + ' ' + d.getFullYear(); } });
-      $.on(m.querySelector('[data-name="Button / Go to My enQ"]'), () => App.go('/myenq'));
-      $.on(m.querySelector('[data-name="Button / Done"]'), () => App.closeOverlay());
-      App.openOverlay(m);
-    }
-  }
-
   /* ================= Decline / close with a reason ================= */
-  async function reasons({ mode, conv }) {
+  /* Decline or close one enquiry. Without `enq`, the oldest waiting one (decline)
+     or the first active one (close). */
+  async function reasons({ mode, conv, enq }) {
     const r = Store.db.session.role;
+    const e = enq || (mode === 'decline' ? conv.enquiries.find(x => x.status === 'pending') : conv.enquiries.find(x => x.status === 'active'));
+    if (!e) return;
     const screen = mode === 'decline' ? F.S.decline : r === 'seller' ? F.S.close : F.B.close;
     const m = await App.subtree(screen, mode === 'decline' ? 'Modal / Decline this enquiry?' : 'Modal / Close this enquiry?');
     const other = r === 'buyer' ? Store.seller(conv.sellerId) : Store.buyer(conv.buyerId);
-    const head = m.querySelector('[data-name="Head"]'); $.texts(head)[1].textContent = `${other.name} · ${Enq.prodLine(conv)} · ${conv.products.map(p => p.qty + ' ' + p.unit).join(' + ')}`;
+    const head = m.querySelector('[data-name="Head"]'); $.texts(head)[1].textContent = `${other.name} · ${e.id} · ${Enq.eLine(e)} · ${Enq.eQty(e)}`;
     $.on($.text(head, '×'), () => App.closeOverlay());
     const list = m.querySelector('[data-name="Reasons (single choice)"]'); const rows = [...list.children];
     const otherRow = rows.find(x => /Other/.test(x.dataset.name)); const otherField = otherRow.querySelector('[data-name="Field / Other reason"]');
@@ -254,8 +268,8 @@ const Modals = (function () {
     $.on(cta, () => {
       if (!chosen) return App.toast('Pick a reason');
       if (chosen === 'Other' && !detail.trim()) return App.toast('Add a short reason for “Other”');
-      if (mode === 'decline') Store.decline(conv.id, chosen, chosen === 'Other' ? detail.trim() : ''); else Store.close(conv.id, r, chosen, chosen === 'Other' ? detail.trim() : '');
-      App.closeOverlay(); App.toast(mode === 'decline' ? 'Enquiry declined' : 'Enquiry closed'); App.refresh();
+      if (mode === 'decline') Store.decline(conv.id, e.id, chosen, chosen === 'Other' ? detail.trim() : ''); else Store.close(conv.id, e.id, r, chosen, chosen === 'Other' ? detail.trim() : '');
+      App.closeOverlay(); App.toast(mode === 'decline' ? e.id + ' declined' : e.id + ' closed'); App.refresh();
     });
     App.openOverlay(m);
   }
@@ -278,6 +292,6 @@ const Modals = (function () {
     App.openOverlay(dd, { anchor: { top: rect.bottom + 8, right: Math.max(16, window.innerWidth - rect.right) } });
   }
 
-  return { enquiry, requirement, reasons, gate, notificationsDropdown, field, suggest, closeSuggest };
+  return { enquiry, reasons, gate, notificationsDropdown, field, suggest, closeSuggest };
 })();
 document.addEventListener('click', e => { if (!e.target.closest('.suggest-pop') && !e.target.closest('.editable')) Modals.closeSuggest(); });

@@ -1,0 +1,81 @@
+<!doctype html><meta charset="utf-8"><title>synctest</title><pre id="out">running</pre>
+<iframe id="f" style="width:1440px;height:900px"></iframe>
+<script>
+/* Checks the design sync (js/sync.js) and the multi-product enquiry form.
+   Serve the folder and open tools/synctest.html; results print as JSON. */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)); const res={}; const errs=[];
+const F=document.getElementById('f'); const W=()=>F.contentWindow, D=()=>F.contentDocument;
+const q=s=>D().querySelector(s), qa=s=>[...D().querySelectorAll(s)], byName=n=>D().querySelector('[data-name="'+n+'"]');
+async function until(fn,t=6000){const s=Date.now();while(Date.now()-s<t){try{const v=fn();if(v)return v;}catch(e){}await sleep(80);}return null;}
+function click(el){ if(!el) throw new Error('click on nothing'); el.dispatchEvent(new (W().MouseEvent)('click',{bubbles:true,cancelable:true})); }
+function type(el,v){ el.textContent=v; el.dispatchEvent(new (W().Event)('input',{bubbles:true})); }
+function key(el,k){ el.dispatchEvent(new (W().KeyboardEvent)('keydown',{key:k,bubbles:true})); }
+async function go(h){ W().location.hash=h; await sleep(1100); }
+const S=()=>W().eval('Store');
+const vis=el=>el && el.offsetParent!==null;
+async function step(name,fn){ try{ await fn(); }catch(e){ res[name+'_ERROR']=String(e&&e.message||e); } }
+const navItems=()=>qa('[data-name="Navigation bar"] [data-name^="Nav item / "]').map(n=>n.dataset.name.replace('Nav item / ',''));
+const footCols=()=>qa('[data-name="Section / Footer"] [data-name^="Col / "], [data-name="Footer"] [data-name^="Col / "]').map(c=>c.dataset.name.replace('Col / ','')+': '+c.innerText.replace(/\n+/g,' · '));
+(async()=>{
+  localStorage.clear(); sessionStorage.clear();
+  F.src='../index.html#/'; await until(()=>D() && D().querySelector('.screen'));
+  W().addEventListener('error',e=>errs.push(e.message)); const ce=W().console.error; W().console.error=(...a)=>{errs.push(a.map(String).join(' ').slice(0,200)); ce.apply(W().console,a);};
+
+  await step('guestHome',async()=>{
+    await go('#/');
+    res.guestNav=navItems(); res.guestUtilityBar=!!byName('Utility bar');
+    res.guestActions=(byName('Header actions')||{}).innerText;
+    res.browseSections=qa('[data-name="Section / Browse by category"]').length;
+    const card=byName('Card / Sell pathway'); res.supplierCard=card && card.innerText.replace(/\n+/g,' | ');
+    res.guestFooter=footCols();
+    res.noRequirementVisible=!qa('div').some(d=>!d.children.length && /Post a requirement/.test(d.textContent) && vis(d));
+  });
+  await step('aboutPricing',async()=>{
+    click(byName('Nav item / About Us')); await sleep(1200);
+    res.aboutHash=W().location.hash; res.aboutActive=(qa('[data-name^="Nav item / "]').find(n=>n.style.borderBottom.startsWith('2px'))||{dataset:{}}).dataset.name;
+    res.aboutSections=qa('.pg-sec').length; res.aboutH1=(q('.pg h1')||{}).textContent;
+    click(byName('Nav item / Pricing')); await sleep(1200);
+    res.pricingH1=(q('.pg h1')||{}).textContent; res.pricingRow1=(qa('.pg-tr')[1]||{}).innerText;
+    click(q('[data-bill="annual"]')); await sleep(200); res.pricingRow1Annual=(qa('.pg-tr')[1]||{}).innerText;
+  });
+  await step('buyerNav',async()=>{
+    click(q('.rolebar [data-role="buyer"]')); await sleep(1100); await go('#/');
+    res.buyerNav=navItems(); res.buyerActions=(byName('Header actions')||{}).innerText.replace(/\n+/g,' | ');
+    res.buyerFooter=footCols();
+    res.buyerHowBtn=(await go('#/how'), (byName('Btn / List your business')||{}).innerText);
+  });
+  await step('sellerNav',async()=>{
+    click(q('.rolebar [data-role="seller"]')); await sleep(1100); await go('#/hub');
+    res.sellerActions=(byName('Header actions')||{}).innerText.replace(/\n+/g,' | '); res.sellerUtilityBar=!!byName('Utility bar');
+    await go('#/help'); res.sellerFooter=footCols();
+  });
+  await step('multiProduct',async()=>{
+    click(q('.rolebar [data-role="buyer"]')); await sleep(900);
+    await go('#/find'); await until(()=>qa('[data-seller-id]').length);
+    const row=qa('[data-name="Seller list"] > [data-seller-id]').find(r=>r.dataset.sellerId==='srilakshmi'); click(row.querySelector('[data-name="Btn / Send enquiry"]'));
+    let m=await until(()=>q('.overlay [data-name="Modal / Send enquiry"]'));
+    let e=[...m.querySelectorAll('.editable')]; type(e[0],'Turmeric Powder'); key(e[0],'Enter'); await sleep(900);
+    m=q('.overlay [data-name="Modal / Send enquiry"]'); e=[...m.querySelectorAll('.editable')]; type(e[1],'2');
+    click(m.querySelector('[data-name="Button / + Add another product"]')); await sleep(1000);
+    m=q('.overlay [data-name="Modal / Send enquiry"]'); res.mpAfterAdd={open:!!m.querySelector('.is-open-product'), summaries:m.querySelectorAll('.product-summary').length, done:!!m.querySelector('.product-done')};
+    // missing quantity → inline message, stays open
+    let op=m.querySelector('.is-open-product'); e=[...op.querySelectorAll('.editable')]; type(e[0],'Chilli Powder Teja S17'); key(e[0],'Enter'); await sleep(900);
+    m=q('.overlay [data-name="Modal / Send enquiry"]'); op=m.querySelector('.is-open-product'); click(op.querySelector('.product-done')); await sleep(300);
+    res.mpInlineError=(m.querySelector('.field-err')||{}).textContent; res.mpStillOpen=!!m.querySelector('.is-open-product');
+    e=[...op.querySelectorAll('.editable')]; type(e[1],'5'); key(e[1],'Enter'); await sleep(1000);
+    m=q('.overlay [data-name="Modal / Send enquiry"]'); res.mpAfterEnter={open:!!m.querySelector('.is-open-product'), summaries:[...m.querySelectorAll('.product-summary')].map(s=>s.innerText.split('\n').slice(0,2).join(' '))};
+    click(m.querySelectorAll('.product-summary')[0]); await sleep(1000);
+    m=q('.overlay [data-name="Modal / Send enquiry"]'); res.mpReopen={open:!!m.querySelector('.is-open-product'), openName:(m.querySelector('.is-open-product .editable')||{}).textContent, summaries:m.querySelectorAll('.product-summary').length};
+    click(m.querySelector('.is-open-product .product-done')); await sleep(1000);
+    m=q('.overlay [data-name="Modal / Send enquiry"]'); click(m.querySelector('[data-name="Button / + Add another product"]')); await sleep(1000);
+    m=q('.overlay [data-name="Modal / Send enquiry"]'); res.mpBlankOpen=!!m.querySelector('.is-open-product');
+    const tog=m.querySelector('[data-name="Similar sellers"] [data-name="Toggle row"]'); if(tog){ click(tog); await sleep(1000); m=q('.overlay [data-name="Modal / Send enquiry"]'); }
+    click(m.querySelector('[data-name="Button / Send enquiry"]')); await sleep(1400);
+    const c=S().db.conversations.find(x=>x.sellerId==='srilakshmi'); res.mpSent=c && c.enquiries.map(x=>x.id+': '+x.products.map(p=>p.name+' '+p.qty+' '+p.unit).join(' + '));
+    res.mpCard=(q('.enq-card')||{}).innerText && q('.enq-card').innerText.replace(/\n+/g,' | ').slice(0,200);
+    res.mpPanel=(q('.enq-panel .ep-item')||{}).innerText && q('.enq-panel .ep-item').innerText.replace(/\n+/g,' | ');
+  });
+  res.errors=errs.slice(0,10);
+  document.getElementById('out').textContent=JSON.stringify(res,null,1); document.title='done';
+})();
+</script>

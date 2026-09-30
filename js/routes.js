@@ -28,6 +28,10 @@ const Routes = (function () {
       case 'categories': return R(pub(G.cats, B.cats), Pages.categories, { title: 'All Categories' });
       case 'product': return R(pub(G.product, B.product), Pages.product, { title: 'Product' });
       case 'how': return R(pub(G.how, B.how), Pages.how, { title: 'How it Works' });
+      /* About Us and Pricing are built inside the How it Works frame for the role (js/sync.js).
+         Sellers work in the Seller Hub; these public pages are for guests and buyers. */
+      case 'about': return who === 'seller' ? { redirect: '/hub' } : R(pub(G.how, B.how), Pages.about, { title: 'About Us' });
+      case 'pricing': return who === 'seller' ? { redirect: '/subscription' } : R(pub(G.how, B.how), Pages.pricing, { title: 'Pricing' });
       case 'find': return R(pub(G.find, B.find), Pages.find, { title: 'Find a Seller', params: q });
       case 'seller': return who === 'guest' ? R(G.find, Pages.find, { params: Object.assign({}, q, { gate: seg[1] }), title: 'Find a Seller' }) : R(B.profile, Pages.profile, { params: { id: seg[1] || 'srilakshmi' }, title: 'Seller profile' });
       case 'help': { const i = Math.max(0, HELP.indexOf(seg[1] || HELP[0])); const set = who === 'seller' ? S.help : who === 'buyer' ? B.help : G.help; return R(set[i], Pages.help, { params: { topic: HELP[i] }, title: 'Help' }); }
@@ -36,16 +40,17 @@ const Routes = (function () {
         const collapsed = Store.db.ui.sidebar === 'collapsed';
         if (!seg[1]) {
           // My enQ opens as a split view: chat list on the left, the newest chat open on the right
-          const first = Store.convsFor(who).filter(c => !(who === 'buyer' && c.hiddenFromBuyer))[0];
+          const first = Store.convsFor(who)[0];
           if (!first) return R(who === 'buyer' ? (collapsed ? B.myenqC : B.myenq) : (collapsed ? S.myenqC : S.myenq), Pages.myenq, { title: 'My enQ', params: q });
           return { redirect: '/myenq/' + first.id };
         }
         const c = Store.conv(seg[1]); if (!c) return { redirect: '/myenq' };
         let screen;
         if (who === 'buyer') screen = c.status === 'active' ? B.chat : c.status === 'pending' ? B.chatWait : B.closed;
-        else screen = c.status === 'active' ? S.chat : c.status === 'pending' ? (c.type === 'requirement' ? S.reqRequest : S.request) : c.status === 'declined' ? S.declined : S.closed;
-        return R(screen, Pages.chat, { params: { id: c.id }, title: 'My enQ' });
+        else screen = c.status === 'active' ? S.chat : c.status === 'pending' ? S.request : c.status === 'declined' ? S.declined : S.closed;
+        return R(screen, Pages.chat, { params: { id: c.id, enq: q.enq }, title: 'My enQ', keepScroll: !!q.enq });
       }
+      case 'overview': return needs('buyer') || R(B.shortlists, Pages.overview, { title: 'Overview' });
       case 'notifications': if (who === 'guest') return { redirect: '/login' }; return R(who === 'buyer' ? B.notifications : S.notifications, Pages.notifications, { title: 'Notifications' });
       case 'shortlists': return needs('buyer') || R(B.shortlists, Pages.shortlists, { title: 'Shortlists' });
       case 'settings': if (who === 'guest') return { redirect: '/login' }; return who === 'buyer' ? R(B.settings, Pages.settings, { title: 'Profile & Settings' }) : R(seg[1] === 'preview' ? S.preview : S.settings, Pages.settings, { title: 'Profile & Settings', params: { preview: seg[1] === 'preview' } });
@@ -79,7 +84,8 @@ const Routes = (function () {
   add([F.B.notifications, F.S.notifications], '/notifications'); add(F.B.shortlists, '/shortlists');
   add([F.B.settings, F.S.settings], '/settings'); add(F.S.preview, '/settings/preview');
   add(F.S.hub, '/hub'); add(F.S.catalogue, '/catalogue'); add(F.S.subscription, '/subscription');
-  add([F.B.req, F.B.reqPicked], () => () => Modals.requirement()); add(F.B.reqPosted, '/myenq');
+  /* Post a requirement was removed from the product; its old links land on Find a Seller */
+  add([F.B.req, F.B.reqPicked], '/find'); add(F.B.reqPosted, '/myenq');
   Object.entries(F.L).forEach(([k, id]) => add(id, '/login/' + k));
   Object.entries(F.RB).forEach(([k, id]) => add(id, '/register/buyer/' + k));
   Object.entries(F.RS).forEach(([k, id]) => add(id, '/register/seller/' + k));

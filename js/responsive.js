@@ -11,14 +11,14 @@ const Responsive = (function () {
   /* ---------------------------------------------------------------- nav drawer */
   const NAV = {
     guest: [
-      ['All Categories', '/categories'], ['How it Works', '/how'], ['Find a Seller', '/find'], ['Help', '/help'],
+      ['About Us', '/about'], ['How it Works', '/how'], ['Category', '/categories'], ['Pricing', '/pricing'], ['Find a Seller', '/find'],
       null,
-      ['Log in', '/login'], ['Register Free', '/register/buyer']
+      ['Log in', '/login'], ['Register for free', '/register/buyer']
     ],
     buyer: [
-      ['All Categories', '/categories'], ['How it Works', '/how'], ['Find a Seller', '/find'], ['Help', '/help'],
+      ['About Us', '/about'], ['How it Works', '/how'], ['Category', '/categories'], ['Pricing', '/pricing'], ['Find a Seller', '/find'],
       null,
-      ['My enQ', '/myenq'], ['Notifications', '/notifications'], ['Shortlists', '/shortlists'], ['Profile & Settings', '/settings']
+      ['Overview', '/overview'], ['My enQ', '/myenq'], ['Notifications', '/notifications'], ['Shortlists', '/shortlists'], ['Profile & Settings', '/settings']
     ],
     seller: [
       ['Seller Hub', '/hub'], ['My enQ', '/myenq'], ['Catalogue', '/catalogue'],

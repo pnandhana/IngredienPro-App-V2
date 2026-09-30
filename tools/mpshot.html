@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>mpshot</title><style>html,body{margin:0}iframe{border:0;display:block}</style>
+<iframe id="f" style="width:1440px;height:1300px"></iframe>
+<script>
+/* Screenshot helper: opens the enquiry form with two products, the second one open. */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)); const F=document.getElementById('f');
+(async()=>{ F.src='../index.html?as=buyer#/find'; await sleep(3500);
+  const W=F.contentWindow, D=F.contentDocument; W.eval("Modals.enquiry({sellerId:'srilakshmi', product:'Turmeric Powder', qty:'2'})"); await sleep(1500);
+  const click=el=>el.dispatchEvent(new W.MouseEvent('click',{bubbles:true}));
+  click(D.querySelector('.overlay [data-name="Button / + Add another product"]')); await sleep(1500);
+  const e=[...D.querySelector('.overlay .is-open-product').querySelectorAll('.editable')]; e[0].textContent='Chilli Powder Teja S17'; e[0].dispatchEvent(new W.Event('input',{bubbles:true})); await sleep(600);
+  D.querySelectorAll('.suggest-pop').forEach(x=>x.remove()); document.title='ready'; })();
+</script>

@@ -1,0 +1,153 @@
+<!doctype html><meta charset="utf-8"><title>enqtest</title><pre id="out">running</pre>
+<iframe id="f" style="width:1440px;height:900px"></iframe>
+<script>
+/* End-to-end check of: registration → accurate account data, empty My enQ until
+   you send, one chat per seller with several enquiries, the enquiry panel and
+   jump-to-enquiry, seller accept, dashboards, profile pictures, role switch.
+   Serve the folder and open tools/enqtest.html; results print as JSON. */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)); const res={}; const errs=[];
+const F=document.getElementById('f'); const W=()=>F.contentWindow, D=()=>F.contentDocument;
+const q=s=>D().querySelector(s), qa=s=>[...D().querySelectorAll(s)], byName=n=>D().querySelector('[data-name="'+n+'"]');
+async function until(fn,t=6000){const s=Date.now();while(Date.now()-s<t){try{const v=fn();if(v)return v;}catch(e){}await sleep(80);}return null;}
+function click(el){ if(!el) throw new Error('click on nothing'); el.dispatchEvent(new (W().MouseEvent)('click',{bubbles:true,cancelable:true})); }
+function type(el,v){ el.textContent=v; el.dispatchEvent(new (W().Event)('input',{bubbles:true})); }
+function key(el,k){ el.dispatchEvent(new (W().KeyboardEvent)('keydown',{key:k,bubbles:true})); }
+async function go(h){ W().location.hash=h; await sleep(1000); }
+const S=()=>W().eval('Store');
+async function step(name,fn){ try{ await fn(); }catch(e){ res[name+'_ERROR']=String(e&&e.message||e); } }
+(async()=>{
+  localStorage.clear(); sessionStorage.clear();
+  F.src='../index.html#/'; await until(()=>D() && D().querySelector('.screen'));
+  W().addEventListener('error',e=>errs.push(e.message)); const ce=W().console.error; W().console.error=(...a)=>{errs.push(a.map(String).join(' ').slice(0,200)); ce.apply(W().console,a);};
+  res.rolebar=!!q('.rolebar [data-role="seller"]'); res.flowSidebarGone=!q('.flownav');
+
+  await step('register',async()=>{
+    await go('#/register/buyer');
+    await until(()=>[...D().querySelectorAll('div')].some(d=>!d.children.length&&d.textContent.trim()==='Your name'));
+    const card=D();
+    const setField=(label,val)=>{ const lab=[...card.querySelectorAll('div')].find(d=>!d.children.length&&d.textContent.trim()===label); const f=lab.closest('[data-name^="Field"]')||lab.parentElement; const e=f.querySelector('.editable'); type(e,val); };
+    setField('Your name','Priya Menon'); setField('Company name','Nimbus Foods Pvt Ltd'); setField('WhatsApp number','98111 22233'); setField('Work email','priya@nimbus.in');
+    click(byName('Button / Continue')); await sleep(1000);
+    res.afterForm=W().location.hash;
+    const cont=await until(()=>byName('Button / Continue')); click(cont); await sleep(1000);
+    res.afterVerify=W().location.hash;
+    click(await until(()=>byName('Button / Start sourcing'))); await sleep(1000);
+    res.afterPrefs=W().location.hash;
+    const acc=S().db.accounts.buyer; res.account={name:acc.name,company:acc.company,phone:acc.phone,email:acc.email,interests:acc.interests,locations:acc.locations};
+  });
+
+  await step('emptyMyEnq',async()=>{
+    await go('#/myenq');
+    res.myenqEmpty=!!q('.empty-note') && qa('[data-conv]').length===0; res.myenqEmptyText=(q('.empty-note')||{}).textContent;
+    res.navShowsCompany=(byName('Navigation bar')||D()).textContent.includes('Nimbus');
+  });
+
+  const sendTo=async(sellerId,product,qty,from)=>{
+    if(from==='find'){ await go('#/find'); await until(()=>qa('[data-seller-id]').length); const row=qa('[data-name="Seller list"] > [data-seller-id]').find(r=>r.dataset.sellerId===sellerId); click(row.querySelector('[data-name="Btn / Send enquiry"]')); }
+    let m=await until(()=>q('.overlay [data-name="Modal / Send enquiry"]'));
+    let eds=[...m.querySelectorAll('.editable')]; type(eds[0],product); key(eds[0],'Enter'); await sleep(900);
+    m=await until(()=>q('.overlay [data-name="Modal / Send enquiry"]')); eds=[...m.querySelectorAll('.editable')];
+    type(eds[1],qty);
+    // similar sellers off, so exactly one seller gets it
+    const tog=m.querySelector('[data-name="Similar sellers"] [data-name="Toggle row"]'); if(tog && S()) { click(tog); await sleep(900); m=await until(()=>q('.overlay [data-name="Modal / Send enquiry"]')); eds=[...m.querySelectorAll('.editable')]; if(eds[1] && !eds[1].textContent) type(eds[1],qty); }
+    res['footer_'+qty]=(m.querySelector('[data-name="Footer"]')||{}).textContent.slice(0,90);
+    click(m.querySelector('[data-name="Button / Send enquiry"]')); await sleep(1300);
+  };
+
+  await step('firstEnquiry',async()=>{
+    await sendTo('srilakshmi','Turmeric Powder','2','find');
+    res.hash1=W().location.hash;
+    const convs=S().db.conversations; res.convCount1=convs.length; res.enq1=convs[0]&&convs[0].enquiries.map(e=>e.id+':'+e.status);
+    res.chatScreen1=(q('.screen')||{}).dataset && q('.screen').dataset.id;
+    res.panel1=qa('.enq-panel .ep-item').length; res.panelStatus1=(q('.enq-panel .ep-pill')||{}).textContent;
+    res.composerLocked=!q('.composer-input');
+  });
+
+  await step('secondEnquirySameSeller',async()=>{
+    const btn=[...qa('.enq-panel .ep-btn')].find(b=>/Send another enquiry/.test(b.textContent)); click(btn);
+    await sendTo('srilakshmi','Chilli Powder Teja S17','5');
+    const convs=S().db.conversations; res.convCount2=convs.length; res.enq2=convs[0].enquiries.map(e=>e.id+':'+e.status);
+    res.panel2=qa('.enq-panel .ep-item').map(i=>i.querySelector('.ep-ref').textContent+' '+i.querySelector('.ep-pill').textContent);
+    res.cardsInChat=qa('.enq-card').map(c=>c.dataset.enq);
+    res.focusedOnNew=(q('.ep-item.current')||{}).dataset && q('.ep-item.current').dataset.enq;
+  });
+
+  await step('sellerSide',async()=>{
+    click(q('.rolebar [data-role="seller"]')); await sleep(1000);
+    const sel=q('.rolebar select'); sel.value='srilakshmi'; sel.dispatchEvent(new (W().Event)('change',{bubbles:true})); await sleep(1300);
+    res.sellerAs=S().db.accounts.seller.company; res.sellerLanding=W().location.hash;
+    await go('#/hub');
+    const tile=byName('Tile / Enquiries received'); res.hubEnquiries=tile && tile.textContent.replace(/\s+/g,' ').slice(0,60);
+    res.hubViews=(byName('Tile / Profile views (30d)')||{}).textContent.replace(/\s+/g,' ').slice(0,50);
+    res.hubNeedsAttention=qa('[data-name="Card / Needs attention"] > [data-name="row"]').length;
+    const c=S().db.conversations[0]; await go('#/myenq/'+c.id);
+    res.sellerCards=qa('.enq-card').length; res.sellerAcceptBtns=qa('.enq-card .ep-btn').filter(b=>b.textContent==='Accept').length;
+    const accept=qa('.enq-card[data-enq="ENQ-1001"] .ep-btn').find(b=>b.textContent==='Accept'); click(accept); await sleep(1400);
+    res.afterAccept=S().db.conversations[0].enquiries.map(e=>e.id+':'+e.status); res.convStatus=S().db.conversations[0].status;
+    res.sellerComposer=!!q('.composer-input'); res.sellerPanel=qa('.enq-panel .ep-item').map(i=>i.querySelector('.ep-ref').textContent+' '+i.querySelector('.ep-pill').textContent);
+  });
+
+  await step('buyerChat',async()=>{
+    click(q('.rolebar [data-role="buyer"]')); await sleep(900);
+    const c=S().db.conversations[0]; await go('#/myenq/'+c.id);
+    res.buyerComposer=!!q('.composer-input');
+    const inp=q('.composer-input'); type(inp,'Hello, please share COA'); key(inp,'Enter'); await sleep(1000);
+    res.msgStored=S().db.conversations[0].messages.filter(m=>m.k==='text').map(m=>m.text);
+    const item=q('.enq-panel .ep-item[data-enq="ENQ-1001"]'); click(item); await sleep(700);
+    const card=q('.enq-card[data-enq="ENQ-1001"]'); res.flash=!!card.querySelector('.enq-flash'); res.currentAfterClick=q('.ep-item.current').dataset.enq;
+    const r=card.getBoundingClientRect(); res.cardInView=r.top>=-10 && r.top< F.clientHeight;
+    res.notifToSeller=S().db.notifications.filter(n=>n.to==='seller:srilakshmi').map(n=>n.title);
+  });
+
+  await step('overviewAndSettings',async()=>{
+    await go('#/overview');
+    res.overview=!!q('.ov'); res.ovTiles=qa('.ov-tile strong').map(x=>x.textContent); res.ovRows=qa('.ov-tr:not(.ov-th)').length; res.ovGreeting=(q('.ov-head h1')||{}).textContent;
+    res.sidebarOverview=!!q('[data-name^="Item / Overview"]');
+    await go('#/settings');
+    res.settingsName=[...qa('.editable')].map(e=>e.textContent).filter(Boolean).slice(0,3);
+    res.photoCardRows=qa('.photo-card .pc-row').length;
+    const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    S().setPhoto('buyer:'+S().db.accounts.buyer.id, png); await go('#/overview');
+    res.navAvatarPhoto=!!q('[data-name="Navigation bar"] .has-photo');
+  });
+
+  await step('sellerSettings',async()=>{
+    click(q('.rolebar [data-role="seller"]')); await sleep(1000);
+    await go('#/settings'); res.sellerPhotoRows=qa('.photo-card .pc-row').length;
+    await go('#/settings/preview'); res.previewCover=!!q('.pv-cover');
+  });
+
+  await step('panelCurrent',async()=>{
+    click(q('.rolebar [data-role="buyer"]')); await sleep(900);
+    const c=S().db.conversations[0]; await go('#/myenq/'+c.id+'?enq=ENQ-1002'); await sleep(1500);
+    res.currentAfterDeepLink=(q('.ep-item.current')||{dataset:{}}).dataset.enq;
+    res.noSampleNotes=!qa('.enq-card').some(x=>/Steam sterilised|Monthly repeat order/.test(x.innerText));  // innerText: hidden rows don't count
+  });
+
+  await step('sellerRegistration',async()=>{
+    click(q('.rolebar [data-role="guest"]')); await sleep(900);
+    await go('#/register/seller');
+    const card=byName('Body')||D();
+    const setField=(label,val)=>{ const lab=[...card.querySelectorAll('div')].find(d=>!d.children.length&&d.textContent.trim()===label); if(!lab) return; const f=lab.closest('[data-name^="Field"]')||lab.parentElement; const e=f.querySelector('.editable'); if(e) type(e,val); };
+    setField('Your name','Ravi Kumar'); setField('Company name','Kaveri Spice Co'); setField('WhatsApp number','98450 77788'); setField('Work email','ravi@kaveri.in');
+    click(byName('Button / Continue')); await sleep(1000); res.sr1=W().location.hash;
+    click(await until(()=>byName('Button / Verify and continue'))); await sleep(1000); res.sr2=W().location.hash;
+    click(await until(()=>byName('Button / Continue'))); await sleep(1000); res.sr3=W().location.hash;
+    click(await until(()=>byName('Button / Run verification check'))); await sleep(3800); res.sr4=W().location.hash;
+    click(await until(()=>byName('Button / Continue'))); await sleep(1000); res.sr5=W().location.hash;
+    const ps=await until(()=>q('[data-name="Product search"] .editable')); type(ps,'turmeric'); await sleep(900); const sg=await until(()=>q('.suggest-pop [data-name^="Suggestion /"]')); click(sg); await sleep(1200); res.srAdded=W().location.hash;
+    click(await until(()=>byName('Button / Continue to plan'))); await sleep(1000); res.sr6=W().location.hash;
+    click(await until(()=>byName('Button / Submit for review'))); await sleep(4200); res.sr7=W().location.hash;
+    const pay=await until(()=>q('[data-name^="Button / Pay"]')); click(pay); await sleep(1000);
+    click(await until(()=>byName('Button / Open Seller Hub'))); await sleep(1400);
+    res.srFinal=W().location.hash; const a=S().db.accounts.seller; res.srAccount={company:a.company,name:a.name,phone:a.phone,type:a.type, registered:S().db.registered.seller===a.id, products:S().seller(a.id).products};
+    res.srHeader=(byName('Navigation bar')||D()).innerText.includes('Kaveri');
+    res.srSwitcher=[...q('.rolebar select').options].slice(0,1).map(o=>o.textContent);
+    await go('#/settings'); res.srSettings=[...qa('.editable')].map(e=>e.textContent).filter(Boolean).slice(0,2);
+  });
+
+  res.errors=errs.slice(0,10);
+  document.getElementById('out').textContent=JSON.stringify(res,null,1);
+  document.title='done';
+})();
+</script>

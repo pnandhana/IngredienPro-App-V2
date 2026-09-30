@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>panelshot</title><style>html,body{margin:0}iframe{border:0;display:block}</style>
+<iframe id="f" style="width:1440px;height:1100px"></iframe>
+<script>
+/* Screenshot helper: one chat with a two-product and a one-product enquiry, to
+   check the enquiry panel. Clears the prototype's data first. */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)); const F=document.getElementById('f');
+(async()=>{ localStorage.clear(); sessionStorage.clear(); F.src='../index.html?as=buyer#/find'; await sleep(3000);
+  const S=F.contentWindow.eval('Store');
+  S.sendEnquiry({sellerIds:['srilakshmi'], products:[{name:'Turmeric Powder',qty:'2',unit:'MT',notes:'',category:'Spices — Whole & Ground'},{name:'Chilli Powder Teja S17',qty:'500',unit:'kg',notes:'',category:'Spices — Whole & Ground'}], type:'direct'});
+  const c=S.sendEnquiry({sellerIds:['srilakshmi'], products:[{name:'Curry Powder — Export Blend',qty:'1',unit:'MT',notes:'',category:'Spice Blends & Seasonings'}], type:'direct'})[0];
+  F.contentWindow.location.hash='#/myenq/'+c.id; await sleep(2500); document.title='ready'; })();
+</script>

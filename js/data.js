@@ -1,5 +1,5 @@
-/* Seed data — taken from what the FINAL wireframes show, so a fresh app looks
-   exactly like Figma before anyone does anything. */
+/* Seed data — the seller directory, product list and the two demo accounts the
+   role switch signs in as before anyone registers. */
 const SEED = (function () {
   const CAT = {
     SPICE: 'Spices — Whole & Ground', OLEO: 'Spice Oleoresins', BLEND: 'Spice Blends & Seasonings',
@@ -52,50 +52,7 @@ const SEED = (function () {
     seller: { role: 'seller', id: 'ashwin', name: 'Ashwin Menon', company: 'Ashwin Spice Works', phone: '98450 11324', email: 'sales@ashwinspice.in' }
   };
 
-  const T = (d, h, m) => new Date(2026, 7, d, h, m).toISOString(); // August 2026
-  const TURM = { name: 'Turmeric Powder, Curcumin ≥5%', qty: '2', unit: 'MT', notes: 'Steam sterilised, 25 kg paper bags. Please share COA with your reply.', category: CAT.SPICE };
-  const C = (id, buyerId, sellerId, products, status, extra) => Object.assign({ id, buyerId, sellerId, products, status, type: 'direct', createdAt: T(12, 10, 12), messages: [], reads: {} }, extra || {});
-  const conv = [
-    C('c-ashwin-turmeric', 'vega', 'ashwin', [TURM], 'active', {
-      createdAt: T(12, 10, 12), acceptedAt: T(12, 10, 24), pinned: true,
-      messages: [
-        { k: 'enquiry', from: 'buyer', at: T(12, 10, 12) },
-        { k: 'event', text: 'accepted', from: 'seller', at: T(12, 10, 24) },
-        { k: 'notice', at: T(12, 10, 24) },
-        { k: 'text', from: 'seller', text: 'Thanks for the enquiry. We can supply 2 MT of 5% curcumin turmeric powder, steam sterilised, 25 kg paper bags.', at: T(12, 10, 26) },
-        { k: 'text', from: 'buyer', text: 'Can you share the COA for the most recent lot?', at: T(12, 10, 31) },
-        { k: 'file', from: 'seller', name: 'COA_Lot_2291.pdf', size: 'PDF · 240 KB', at: T(12, 10, 44) },
-        { k: 'text', from: 'seller', text: 'Yes, we can supply 2 MT. The rate will be ₹138 per kg, packed in 25 kg bags.', at: T(12, 10, 58) }
-      ], reads: { buyer: T(12, 10, 40) }
-    }),
-    C('c-agropure', 'vega', 'agropure', [{ name: 'Dried Chilli — Whole', qty: '1', unit: 'MT', notes: 'Stemless, 10 kg cartons.', category: CAT.SPICE }], 'active', {
-      createdAt: T(12, 8, 30), acceptedAt: T(12, 9, 10),
-      messages: [{ k: 'enquiry', from: 'buyer', at: T(12, 8, 30) }, { k: 'event', text: 'accepted', from: 'seller', at: T(12, 9, 10) }, { k: 'text', from: 'seller', text: 'Can share COA for the current lot.', at: T(12, 11, 5) }], reads: { buyer: T(12, 9, 0) }
-    }),
-    C('c-nutriva', 'vega', 'nutriva', [{ name: 'Citric Acid Anhydrous BP', qty: '500', unit: 'kg', notes: '', category: CAT.ACID }], 'active', {
-      createdAt: T(10, 9, 0), acceptedAt: T(10, 11, 0),
-      messages: [{ k: 'enquiry', from: 'buyer', at: T(10, 9, 0) }, { k: 'event', text: 'accepted', from: 'seller', at: T(10, 11, 0) }, { k: 'text', from: 'seller', text: 'Quote: ₹96/kg ex-works, 25 kg bags.', at: T(11, 10, 0) }, { k: 'text', from: 'buyer', text: 'Accepted the quote', at: T(12, 9, 0) }], reads: { buyer: T(12, 9, 0) }
-    }),
-    C('c-sunfield', 'vega', 'sunfield', [TURM], 'active', {
-      createdAt: T(9, 9, 0), acceptedAt: T(9, 12, 0),
-      messages: [{ k: 'enquiry', from: 'buyer', at: T(9, 9, 0) }, { k: 'event', text: 'accepted', from: 'seller', at: T(9, 12, 0) }, { k: 'text', from: 'seller', text: '₹145/kg, valid 5 days.', at: T(10, 9, 0) }, { k: 'text', from: 'buyer', text: 'Can you hold this price for September?', at: T(11, 9, 0) }], reads: { buyer: T(11, 9, 0) }
-    }),
-    C('c-nilgiri', 'vega', 'nilgiri', [{ name: 'Whey Protein Conc. 80%', qty: '250', unit: 'kg', notes: '', category: CAT.DAIRY }], 'pending', { createdAt: T(11, 9, 0), messages: [{ k: 'enquiry', from: 'buyer', at: T(11, 9, 0) }] }),
-    C('c-meridian', 'vega', 'meridian', [TURM], 'pending', { createdAt: T(9, 9, 40), messages: [{ k: 'enquiry', from: 'buyer', at: T(9, 9, 40) }] }),
-    // Ashwin's side (seller demo account)
-    C('c-northline', 'northline', 'ashwin', [{ name: 'Chilli Powder Teja S17', qty: '5', unit: 'MT', notes: 'ASTA 80+, 25 kg bags.', category: CAT.SPICE }], 'pending', { createdAt: T(13, 8, 30), messages: [{ k: 'enquiry', from: 'buyer', at: T(13, 8, 30) }] }),
-    C('c-kerala', 'kerala', 'ashwin', [{ name: 'Turmeric Powder', qty: '800', unit: 'kg', notes: '', category: CAT.SPICE }], 'active', {
-      createdAt: T(12, 14, 0), acceptedAt: T(12, 15, 0),
-      messages: [{ k: 'enquiry', from: 'buyer', at: T(12, 14, 0) }, { k: 'event', text: 'accepted', from: 'seller', at: T(12, 15, 0) }, { k: 'text', from: 'buyer', text: 'Can you do 800 kg of turmeric powder by Friday?', at: T(13, 7, 30) }, { k: 'text', from: 'buyer', text: 'Need it for a Monday production run.', at: T(13, 7, 31) }], reads: { seller: T(12, 16, 0) }
-    }),
-    C('c-sunrise', 'sunrise', 'ashwin', [{ name: 'Cardamom 8mm — Green, bold', qty: '100', unit: 'kg', notes: 'Monthly repeat order. Please share your best rate and lead time.', category: CAT.SPICE }], 'active', {
-      createdAt: T(13, 11, 4), acceptedAt: T(13, 11, 20),
-      messages: [{ k: 'enquiry', from: 'buyer', at: T(13, 11, 4) }, { k: 'event', text: 'accepted', from: 'seller', at: T(13, 11, 20) }, { k: 'notice', at: T(13, 11, 20) }, { k: 'text', from: 'seller', text: 'Thanks for the enquiry. We can supply 8mm bold cardamom from the current Idukki lot.', at: T(13, 11, 26) }, { k: 'file', from: 'seller', name: 'COA_Lot_2291.pdf', size: 'PDF · 180 KB', at: T(13, 11, 27) }], reads: { seller: T(13, 11, 30) }
-    }),
-    C('c-coastal', 'coastal', 'ashwin', [{ name: 'Turmeric Powder', qty: '3', unit: 'MT', notes: '', category: CAT.SPICE }], 'active', {
-      createdAt: T(11, 10, 0), acceptedAt: T(11, 11, 0),
-      messages: [{ k: 'enquiry', from: 'buyer', at: T(11, 10, 0) }, { k: 'event', text: 'accepted', from: 'seller', at: T(11, 11, 0) }, { k: 'text', from: 'seller', text: 'Quote sent — ₹142 / kg, valid 5 days', at: T(12, 17, 0) }], reads: { seller: T(12, 17, 0) }
-    })
-  ];
-  return { CAT, PRODUCTS, SELLERS, BUYERS, ACCOUNTS, conversations: conv };
+  /* No demo conversations: My enQ, notifications and dashboards start empty and
+     fill only with what the user does in the app. */
+  return { CAT, PRODUCTS, SELLERS, BUYERS, ACCOUNTS };
 })();

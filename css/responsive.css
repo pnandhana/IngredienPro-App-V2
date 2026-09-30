@@ -17,8 +17,8 @@
 /* ---------------------------------------------------------------- fluid canvas */
 #stage {
   display: block;
-  /* The flow sidebar takes 272px out of the window, so every breakpoint below is
-     asked of the app's own width, not the viewport's. */
+  /* Every breakpoint below is asked of the app's own width, not the viewport's,
+     so the layout stays right if anything is ever docked beside the app. */
   container-type: inline-size;
   container-name: stage;
 }

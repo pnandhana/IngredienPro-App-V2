@@ -133,7 +133,7 @@ Pages.find = (el, p) => {
     row.dataset.sellerId = s.id; delete row.dataset.bound;
     const nameT = row.querySelector('[data-name="name"]') && $.texts(row.querySelector('[data-name="name"]'))[0];
     if (nameT && !guest) nameT.textContent = s.name;
-    const logo = row.querySelector('[data-name="logo"]'); if (logo && !guest) $.texts(logo)[0].textContent = s.initial;
+    if (!guest) Photo.paint(row.querySelector('[data-name="logo"]'), Store.photo('seller:' + s.id), s.initial);   // guests see masked sellers, logo included
     const badges = row.querySelector('[data-name="badges"]'); if (badges) { const t = $.texts(badges); if (t[1]) t[1].textContent = s.type; }
     const idn = row.querySelector('[data-name="identity"]');
     const loc = idn && $.texts(idn).find(x => /yrs$/.test(x.textContent.trim())); if (loc) loc.textContent = (guest ? s.state : s.city + ', ' + s.state) + '  ·  ' + s.years + ' yrs';
@@ -147,6 +147,7 @@ Pages.find = (el, p) => {
     const res = Store.db.sellers.filter(s => !s.isNew || true).filter(match);
     $.clear(list);
     res.forEach(s => { const r = $.clone(tpl); fill(r, s); list.appendChild(r); });
+    Store.trackSearch(res.map(s => s.id));   // feeds "Search appearances" on each seller's dashboard
     if (!res.length) { const e = document.createElement('div'); e.className = 'empty-note'; e.textContent = 'No sellers match. Try another product name or clear the filters.'; list.appendChild(e); }
     $.set(el, /verified sellers$|sellers sell /, `${res.length} verified seller${res.length === 1 ? '' : 's'}`);
     $.set(el, /^Showing /, `Showing ${res.length ? 1 : 0}–${res.length} of ${res.length} sellers`);
@@ -171,16 +172,15 @@ Pages.find = (el, p) => {
       el.insertBefore(b, el.children[1]);
     });
   } else sessionStorage.removeItem('ip.carry');
-  // post a requirement card in results
-  const pr = el.querySelector('[data-name="Button / Post a requirement"]'); $.on(pr, () => guest ? U.guestGate() : Modals.requirement());
 };
 
 /* ---------- Seller profile (buyer view) ---------- */
 Pages.profile = (el, p) => {
   const s = Store.seller(p.id) || Store.seller('srilakshmi');
+  Store.trackView(s.id);   // feeds "Profile views" on the seller's dashboard
+  SellerFace.apply(el, s);  // logo + storefront cover
   const card = el.querySelector('[data-name="Profile card"]');
   if (card) {
-    $.texts(card.querySelector('[data-name="logo"]'))[0].textContent = s.initial;
     $.set(card, 'Sri Lakshmi Spice Mills', s.name);
     $.set(card, /^Manufacturer\s+·/, `${s.type}  ·  ${s.city}, ${s.state}  ·  Trading since ${2026 - s.years}  ·  Member since 2024`);
     $.set(card, /^★/, '★ ' + s.rating); $.set(card, /rated deals$/, s.deals + ' rated deals'); $.set(card, /^~\d/, s.respond.replace('~', '~'));

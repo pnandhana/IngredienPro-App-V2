@@ -1,60 +1,68 @@
 /* One shared record for the whole app. Buyer and seller read and write the
    same conversations, so an enquiry the buyer sends IS the request the seller
    sees. Saved to localStorage and synced live across tabs (open the buyer in
-   one tab and the seller in another). */
+   one tab and the seller in another).
+
+   Model (v4)
+   - One conversation per buyer–seller pair. It holds every enquiry that buyer
+     has sent that seller, in the order they were sent.
+   - Each enquiry has its own reference (ENQ-1001…), products, status
+     (pending → active | declined, active → closed) and deal flag. The seller
+     accepts or declines each one separately.
+   - The conversation's status is derived: active if any enquiry is active,
+     pending if none is active but one is waiting, otherwise closed/declined.
+   - The app starts empty. Everything in My enQ, the notifications and the
+     dashboards comes from what the user does in this browser. */
 const Store = (function () {
-  const KEY = 'ingredienpro.app.v3';
+  const KEY = 'ingredienpro.app.v4';
   const subs = [];
   let db = load();
 
   function fresh() {
+    const accounts = JSON.parse(JSON.stringify(SEED.ACCOUNTS));
     return {
-      v: 3,
+      v: 4,
       session: { role: 'guest' },            // guest | buyer | seller
-      accounts: JSON.parse(JSON.stringify(SEED.ACCOUNTS)),
+      accounts,                              // the buyer and seller currently signed in
+      sellerAccounts: { [accounts.seller.id]: accounts.seller },  // seller identities used so far
+      registered: { buyer: null, seller: null },                  // ids created through Register Free
       sellers: JSON.parse(JSON.stringify(SEED.SELLERS)),
       buyers: JSON.parse(JSON.stringify(SEED.BUYERS)),
-      conversations: JSON.parse(JSON.stringify(SEED.conversations)),
-      requirements: [],
-      shortlists: { vega: ['ashwin', 'srilakshmi', 'meridian', 'sunfield', 'nilgiri'] },
-      notifications: seedNotifications(),
+      conversations: [],
+      notifications: [],
+      shortlists: {},
+      photos: {},                            // 'buyer:<id>' | 'seller:<id>' → logo/photo, 'cover:<sellerId>' → storefront cover
+      stats: { views: {}, search: {} },      // sellerId → [{ by, at }] / count
       catalogue: { ashwin: [
         { name: 'Turmeric Powder, Curcumin ≥5%', category: 'Spices — Whole & Ground', moq: '500 kg', status: 'Live' },
         { name: 'Cardamom 8mm — Green, bold', category: 'Spices — Whole & Ground', moq: '50 kg', status: 'Live' },
         { name: 'Chilli Powder Teja S17', category: 'Spices — Whole & Ground', moq: '1 MT', status: 'Live' },
         { name: 'Turmeric Oleoresin 95%', category: 'Oleoresins & Extracts', moq: '25 kg', status: 'Pending review' },
         { name: 'Black Pepper Powder', category: 'Spices — Whole & Ground', moq: '200 kg', status: 'Pending review' },
-        { name: 'Coriander Powder', category: 'Spices — Whole & Ground', moq: '100 kg', status: 'Pending review' } ] },                         // sellerId -> [{name, category, moq, status}]
+        { name: 'Coriander Powder', category: 'Spices — Whole & Ground', moq: '100 kg', status: 'Pending review' } ] },
       seq: 1100,
+      enqSeq: 1000,
       ui: { sidebar: 'expanded' }
     };
   }
-  function seedNotifications() {
-    const t = (d, h, m) => new Date(2026, 7, d, h, m).toISOString();
-    const N = (to, kind, title, text, at, read, conv) => ({ id: 'n-' + Math.random().toString(36).slice(2, 8), to, kind, title, text, at, read, conv });
-    return [
-      N('buyer:vega', 'accepted', 'A seller accepted your enquiry', 'Ashwin Spice Works accepted your enquiry · Turmeric Powder. Chat is now open.', t(12, 10, 24), false, 'c-ashwin-turmeric'),
-      N('buyer:vega', 'message', 'New message', 'Sunfield Agro Exports: ₹145/kg, valid 5 days.', t(10, 9, 0), false, 'c-sunfield'),
-      N('buyer:vega', 'message', 'New message', 'AgroPure Ingredients: Can share COA for the current lot.', t(12, 11, 5), false, 'c-agropure'),
-      N('buyer:vega', 'waiting', 'No response on your enquiry yet', 'Meridian Foods Pvt Ltd hasn’t accepted your Turmeric Powder enquiry.', t(11, 9, 40), false, 'c-meridian'),
-      N('buyer:vega', 'info', 'A seller you shortlisted is unavailable', 'Deccan Spice Traders — FSSAI licence expired, listings removed.', t(9, 16, 0), true),
-      N('seller:ashwin', 'request', 'New enquiry', 'Northline Foods — Chilli Powder Teja S17, 5 MT.', t(13, 8, 30), false, 'c-northline'),
-      N('seller:ashwin', 'message', 'Buyer replied', 'Kerala Agro Mills sent 2 messages about Turmeric Powder.', t(13, 7, 31), false, 'c-kerala'),
-      N('seller:ashwin', 'info', 'Listing approved', 'Cardamom 8mm — Green, bold is live and appearing in search.', t(12, 11, 5), false),
-      N('seller:ashwin', 'info', 'Subscription renews in 30 days', '3 categories · renews 12 Sep. Card on file will be charged.', t(10, 9, 0), true)
-    ];
-  }
   function load() {
     let d = null;
-    try { d = JSON.parse(localStorage.getItem(KEY)); if (!d || d.v !== 3) d = null; } catch (e) {}
+    try { d = JSON.parse(localStorage.getItem(KEY)); if (!d || d.v !== 4) d = null; } catch (e) {}
     d = d || fresh();
     // the role is per browser tab, so a buyer tab and a seller tab can run side by side
     try { const r = sessionStorage.getItem('ingredienpro.role'); if (r) d.session = { role: r }; } catch (e) {}
+    try { const s = sessionStorage.getItem('ingredienpro.sellerAs'); if (s && d.sellerAccounts[s]) d.accounts.seller = d.sellerAccounts[s]; } catch (e) {}
     return d;
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(db)); }
+    catch (e) { console.warn('Could not save — browser storage is full', e); }
+  }
   function emit(kind) { subs.forEach(fn => { try { fn(kind); } catch (e) { console.error(e); } }); }
-  function commit(kind) { try { sessionStorage.setItem('ingredienpro.role', db.session.role); } catch (e) {} save(); emit(kind || 'data'); }
+  function commit(kind) {
+    try { sessionStorage.setItem('ingredienpro.role', db.session.role); sessionStorage.setItem('ingredienpro.sellerAs', db.accounts.seller.id); } catch (e) {}
+    save(); emit(kind || 'data');
+  }
   window.addEventListener('storage', e => { if (e.key === KEY) { db = load(); emit('sync'); } });
 
   const now = () => new Date().toISOString();
@@ -64,13 +72,15 @@ const Store = (function () {
   const seller = sid => db.sellers.find(s => s.id === sid);
   const buyer = bid => db.buyers.find(b => b.id === bid);
   const conv = cid => db.conversations.find(c => c.id === cid);
+  const pairConv = (bid, sid) => db.conversations.find(c => c.buyerId === bid && c.sellerId === sid);
+  const enq = (c, eid) => c && c.enquiries.find(e => e.id === eid);
   const me = () => {
     const s = db.session;
     if (s.role === 'buyer') return Object.assign({}, db.accounts.buyer, { org: buyer(db.accounts.buyer.id) });
     if (s.role === 'seller') return Object.assign({}, db.accounts.seller, { org: seller(db.accounts.seller.id) });
     return { role: 'guest' };
   };
-  function sellsAll(s, products) { return products.every(p => s.products.includes(p.name) || s.categories.some(c => c.name === p.category) && s.products.some(x => x.split(/[,—(]/)[0].trim() === p.name.split(/[,—(]/)[0].trim())); }
+  function sellsAll(s, products) { return products.every(p => sellsProduct(s, p.name)); }
   function sellsProduct(s, name) { const base = name.split(/[,—(]/)[0].trim().toLowerCase(); return s.products.some(x => x.toLowerCase() === name.toLowerCase() || x.split(/[,—(]/)[0].trim().toLowerCase() === base); }
 
   function lastActivity(c) { const m = c.messages[c.messages.length - 1]; return m ? m.at : c.createdAt; }
@@ -81,66 +91,109 @@ const Store = (function () {
   function convsFor(role) {
     const acc = db.accounts[role]; if (!acc) return [];
     const key = role === 'buyer' ? 'buyerId' : 'sellerId';
-    return db.conversations.filter(c => c[key] === acc.id).sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || lastActivity(b).localeCompare(lastActivity(a)));
+    return db.conversations.filter(c => c[key] === acc.id).sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)));
+  }
+  /* every enquiry the signed-in buyer sent / seller received, newest first, with its conversation */
+  function enquiriesFor(role) {
+    return convsFor(role).flatMap(c => c.enquiries.map(e => ({ c, e }))).sort((a, b) => b.e.createdAt.localeCompare(a.e.createdAt));
+  }
+
+  /* The conversation's status and headline fields follow its enquiries, so the
+     list, previews and routes keep working off `c.status` / `c.products`. */
+  function recalc(c) {
+    const E = c.enquiries;
+    const active = E.some(e => e.status === 'active'), pending = E.some(e => e.status === 'pending');
+    c.status = active ? 'active' : pending ? 'pending' : E.every(e => e.status === 'declined') ? 'declined' : 'closed';
+    const latest = E[E.length - 1];
+    c.products = latest.products; c.type = latest.type;
+    c.deal = E.some(e => e.deal);
+    if (c.status === 'closed' || c.status === 'declined') {
+      const last = E.filter(e => e.closedAt).sort((a, b) => a.closedAt.localeCompare(b.closedAt)).pop() || latest;
+      c.closedBy = last.closedBy; c.closedAt = last.closedAt; c.reason = last.reason; c.reasonDetail = last.reasonDetail;
+    } else { delete c.closedBy; delete c.closedAt; delete c.reason; delete c.reasonDetail; }
   }
 
   function notify(to, n) { db.notifications.unshift(Object.assign({ id: id('n'), to, at: now(), read: false }, n)); }
+  const prodLine = products => products.map(p => p.name).join(' + ');
 
   /* ---- actions ---- */
   const A = {
     setRole(role) { db.session = { role }; commit('session'); },
     setSidebar(v) { db.ui.sidebar = v; commit('ui'); },
+    /* In Seller view you can act as any seller in the directory, so you can
+       answer an enquiry the buyer sent to whoever they picked. */
+    setSellerIdentity(sid) {
+      const s = seller(sid); if (!s) return;
+      if (!db.sellerAccounts[sid]) db.sellerAccounts[sid] = { role: 'seller', id: sid, name: 'Sales team', company: s.name, phone: '', email: '', type: s.type };
+      db.accounts.seller = db.sellerAccounts[sid];
+      commit('session');
+    },
 
-    /* One form, one or more products, one chat per seller. */
+    /* Each seller gets the enquiry in their one chat with this buyer. A second
+       enquiry to the same seller joins that chat, as its own enquiry. */
     sendEnquiry({ sellerIds, products, type }) {
       const b = db.accounts.buyer.id; const made = [];
       for (const sid of sellerIds) {
-        const c = { id: id('c'), buyerId: b, sellerId: sid, products: JSON.parse(JSON.stringify(products)), status: 'pending', type: type || 'direct', createdAt: now(), messages: [{ k: 'enquiry', from: 'buyer', at: now() }], reads: { buyer: now() } };
-        db.conversations.unshift(c); made.push(c);
-        notify('seller:' + sid, { kind: 'request', conv: c.id, title: 'New enquiry', text: `${buyer(b).name} — ${products.map(p => p.name).join(' + ')}, ${products[0].qty} ${products[0].unit}.` });
+        let c = pairConv(b, sid);
+        if (!c) { c = { id: id('c'), buyerId: b, sellerId: sid, createdAt: now(), enquiries: [], messages: [], reads: {} }; db.conversations.unshift(c); }
+        const e = { id: 'ENQ-' + (++db.enqSeq), products: JSON.parse(JSON.stringify(products)), type: type || 'direct', status: 'pending', createdAt: now() };
+        c.enquiries.push(e);
+        c.messages.push({ k: 'enquiry', enq: e.id, from: 'buyer', at: e.createdAt });
+        c.reads.buyer = now();
+        recalc(c);
+        notify('seller:' + sid, { kind: 'request', conv: c.id, enq: e.id, title: `New enquiry ${e.id}`, text: `${buyer(b).name} — ${prodLine(products)}, ${products[0].qty} ${products[0].unit}.` });
+        c.lastEnq = e.id; made.push(c);
       }
       commit('enquiry'); return made;
     },
-    postRequirement({ product, qty, unit, notes, category }) {
-      const b = db.accounts.buyer.id;
-      const targets = db.sellers.filter(s => s.categories.some(c => c.name === category));
-      const r = { id: id('r'), buyerId: b, product, qty, unit, notes, category, sellerIds: targets.map(s => s.id), status: 'open', createdAt: now() };
-      db.requirements.unshift(r);
-      for (const s of targets) {
-        const c = { id: id('c'), buyerId: b, sellerId: s.id, products: [{ name: product, qty, unit, notes, category }], status: 'pending', type: 'requirement', requirementId: r.id, hiddenFromBuyer: true, createdAt: now(), messages: [{ k: 'enquiry', from: 'buyer', at: now() }], reads: { buyer: now() } };
-        db.conversations.unshift(c);
-        notify('seller:' + s.id, { kind: 'request', conv: c.id, title: 'New requirement in your category', text: `${buyer(b).name} — ${product}, ${qty} ${unit}.` });
-      }
-      commit('requirement'); return r;
-    },
-    accept(cid) {
-      const c = conv(cid); c.status = 'active'; c.acceptedAt = now(); c.hiddenFromBuyer = false;
-      c.messages.push({ k: 'event', text: 'accepted', from: 'seller', at: now() }, { k: 'notice', at: now() });
-      c.reads.seller = now();
-      notify('buyer:' + c.buyerId, { kind: 'accepted', conv: c.id, title: `${seller(c.sellerId).name} accepted your enquiry`, text: `${c.products.map(p => p.name).join(' + ')}. Chat is now open.` });
+    /* seller accepts one enquiry; without an id, the oldest waiting one */
+    accept(cid, eid) {
+      const c = conv(cid); const e = eid ? enq(c, eid) : c.enquiries.find(x => x.status === 'pending'); if (!e) return;
+      const first = !c.enquiries.some(x => x.acceptedAt);
+      e.status = 'active'; e.acceptedAt = now();
+      c.messages.push({ k: 'event', text: 'accepted', enq: e.id, from: 'seller', at: now() });
+      if (first) c.messages.push({ k: 'notice', at: now() });
+      c.reads.seller = now(); recalc(c);
+      notify('buyer:' + c.buyerId, { kind: 'accepted', conv: c.id, enq: e.id, title: `${seller(c.sellerId).name} accepted ${e.id}`, text: `${prodLine(e.products)}. ${first ? 'Chat is now open.' : 'It’s now active in your chat.'}` });
       commit('accept');
     },
-    decline(cid, reason, detail) {
-      const c = conv(cid); c.status = 'declined'; c.closedBy = 'seller'; c.closedAt = now(); c.reason = reason; c.reasonDetail = detail || '';
-      c.messages.push({ k: 'closed', from: 'seller', verb: 'declined', reason, detail, at: now() });
-      if (c.type !== 'requirement') notify('buyer:' + c.buyerId, { kind: 'declined', conv: c.id, title: `${seller(c.sellerId).name} declined your enquiry`, text: reason + (detail ? ' — ' + detail : '') });
+    decline(cid, eid, reason, detail) {
+      const c = conv(cid); const e = enq(c, eid); if (!e) return;
+      e.status = 'declined'; e.closedBy = 'seller'; e.closedAt = now(); e.reason = reason; e.reasonDetail = detail || '';
+      c.messages.push({ k: 'closed', enq: e.id, from: 'seller', verb: 'declined', reason, detail, at: now() });
+      recalc(c);
+      notify('buyer:' + c.buyerId, { kind: 'declined', conv: c.id, enq: e.id, title: `${seller(c.sellerId).name} declined ${e.id}`, text: reason + (detail ? ' — ' + detail : '') });
       commit('decline');
     },
-    close(cid, role, reason, detail) {
-      const c = conv(cid); c.status = 'closed'; c.closedBy = role; c.closedAt = now(); c.reason = reason; c.reasonDetail = detail || '';
-      c.messages.push({ k: 'closed', from: role, verb: 'closed', reason, detail, at: now() });
+    close(cid, eid, role, reason, detail) {
+      const c = conv(cid); const e = enq(c, eid); if (!e) return;
+      e.status = 'closed'; e.closedBy = role; e.closedAt = now(); e.reason = reason; e.reasonDetail = detail || '';
+      c.messages.push({ k: 'closed', enq: e.id, from: role, verb: 'closed', reason, detail, at: now() });
+      recalc(c);
       const other = role === 'buyer' ? 'seller:' + c.sellerId : 'buyer:' + c.buyerId;
       const who = role === 'buyer' ? buyer(c.buyerId).name : seller(c.sellerId).name;
-      notify(other, { kind: 'closed', conv: c.id, title: `${who} closed the enquiry`, text: reason + (detail ? ' — ' + detail : '') });
+      notify(other, { kind: 'closed', conv: c.id, enq: e.id, title: `${who} closed ${e.id}`, text: reason + (detail ? ' — ' + detail : '') });
       commit('close');
     },
-    undoDecline(cid) { const c = conv(cid); c.status = 'pending'; delete c.reason; c.messages = c.messages.filter(m => m.k !== 'closed'); commit('undo'); },
-    dealAgreed(cid, role) { const c = conv(cid); c.deal = { by: role, at: now() }; c.messages.push({ k: 'event', text: 'deal', from: role, at: now() }); commit('deal'); },
-    message(cid, role, text) {
-      const c = conv(cid); c.messages.push({ k: 'text', from: role, text, at: now() }); c.reads[role] = now();
+    undoDecline(cid, eid) {
+      const c = conv(cid); const e = enq(c, eid); if (!e) return;
+      e.status = 'pending'; ['closedBy', 'closedAt', 'reason', 'reasonDetail'].forEach(k => delete e[k]);
+      c.messages = c.messages.filter(m => !(m.k === 'closed' && m.enq === eid));
+      recalc(c); commit('undo');
+    },
+    dealAgreed(cid, eid, role) {
+      const c = conv(cid); const e = enq(c, eid); if (!e || e.deal) return;
+      e.deal = { by: role, at: now() };
+      c.messages.push({ k: 'event', text: 'deal', enq: e.id, from: role, at: now() });
+      recalc(c); commit('deal');
+    },
+    message(cid, role, text, file) {
+      const c = conv(cid);
+      c.messages.push(file ? { k: 'file', from: role, name: file.name, size: file.size, at: now() } : { k: 'text', from: role, text, at: now() });
+      c.reads[role] = now();
       const other = role === 'buyer' ? 'seller:' + c.sellerId : 'buyer:' + c.buyerId;
       const who = role === 'buyer' ? buyer(c.buyerId).name : seller(c.sellerId).name;
-      notify(other, { kind: 'message', conv: c.id, title: 'New message', text: `${who}: ${text.slice(0, 80)}` });
+      notify(other, { kind: 'message', conv: c.id, title: 'New message', text: `${who}: ${(file ? '📎 ' + file.name : text).slice(0, 80)}` });
       commit('message');
     },
     markRead(cid, role) { const c = conv(cid); if (!c) return; c.reads = c.reads || {}; c.reads[role] = now(); save(); },
@@ -150,30 +203,60 @@ const Store = (function () {
       commit('shortlist'); return i < 0;
     },
     readAllNotifications(who) { db.notifications.forEach(n => { if (n.to === who) n.read = true; }); commit('notif'); },
+
+    /* ---- profile pictures ---- */
+    setPhoto(key, dataUrl) { if (dataUrl) db.photos[key] = dataUrl; else delete db.photos[key]; commit('photo'); },
+
+    /* ---- activity the seller dashboard reports on ---- */
+    trackView(sid) {
+      if (db.session.role !== 'buyer') return;           // guests are masked; sellers and admins don't count
+      const list = db.stats.views[sid] = db.stats.views[sid] || [];
+      const by = db.accounts.buyer.id; const day = now().slice(0, 10);
+      if (!list.some(v => v.by === by && v.at.slice(0, 10) === day)) { list.push({ by, at: now() }); save(); }   // one view per buyer per day
+    },
+    trackSearch(ids) { if (db.session.role === 'seller') return; ids.forEach(sid => { db.stats.search[sid] = (db.stats.search[sid] || 0) + 1; }); save(); },
+
+    /* ---- Register Free (verification is skipped in this prototype) ---- */
     registerBuyer(form) {
       const bid = 'u-' + (++db.seq);
-      db.buyers.push({ id: bid, name: form.company || 'New buyer', short: form.company || 'New buyer', initials: (form.company || 'NB').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(), contact: form.name, type: 'Food manufacturer', city: '', state: '', rating: 0, enquiries: 0, deals: 0, since: 2026 });
-      db.accounts.buyer = { role: 'buyer', id: bid, name: form.name, company: form.company, phone: form.phone, email: form.email };
+      const company = form.company || 'New buyer';
+      db.buyers.push({ id: bid, name: company, short: company.replace(/ (Pvt )?Ltd\.?$/, ''), initials: initials(company), contact: form.name, type: 'Food business', city: form.city || '', state: '', rating: 0, enquiries: 0, deals: 0, since: new Date().getFullYear() });
+      db.accounts.buyer = { role: 'buyer', id: bid, name: form.name, company, phone: form.phone, email: form.email, interests: form.interests || [], locations: form.locations || [], createdAt: now() };
+      db.registered.buyer = bid;
       db.shortlists[bid] = [];
       db.session = { role: 'buyer' }; commit('session');
     },
     registerSeller(form, products) {
       const sid = 's-' + (++db.seq);
+      const company = form.company || 'New seller';
       const cats = {}; (products || []).forEach(p => { cats[p.category] = (cats[p.category] || 0) + 1; });
-      db.sellers.push({ id: sid, name: form.company || 'New seller', initial: (form.company || 'N')[0], type: form.type || 'Manufacturer', city: form.city || 'Bengaluru', state: form.state || 'Karnataka', years: 1, certs: ['FSSAI Central'], rating: 0, deals: 0, respond: '—', categories: Object.entries(cats).map(([name, count]) => ({ name, count })), products: (products || []).map(p => p.name), verified: true, isNew: true });
-      db.accounts.seller = { role: 'seller', id: sid, name: form.name, company: form.company, phone: form.phone, email: form.email };
+      db.sellers.push({ id: sid, name: company, initial: company[0], type: form.type || 'Manufacturer', city: form.city || 'Bengaluru', state: form.state || 'Karnataka', years: 1, certs: ['FSSAI Central'], rating: 0, deals: 0, respond: '—', categories: Object.entries(cats).map(([name, count]) => ({ name, count })), products: (products || []).map(p => p.name), verified: true, isNew: true });
+      const acc = { role: 'seller', id: sid, name: form.name, company, phone: form.phone, email: form.email, type: form.type || 'Manufacturer', createdAt: now() };
+      db.sellerAccounts[sid] = acc; db.accounts.seller = acc; db.registered.seller = sid;
       db.catalogue[sid] = (products || []).map(p => ({ name: p.name, category: p.category, moq: '—', status: 'Pending review' }));
       db.session = { role: 'seller' }; commit('session');
+    },
+    updateAccount(role, patch) {
+      const acc = db.accounts[role]; Object.assign(acc, patch);
+      if (role === 'buyer') { const b = buyer(acc.id); if (b && patch.company) { b.name = patch.company; b.short = patch.company.replace(/ (Pvt )?Ltd\.?$/, ''); b.initials = initials(patch.company); } if (b && patch.name) b.contact = patch.name; }
+      if (role === 'seller') { const s = seller(acc.id); if (s && patch.company) { s.name = patch.company; s.initial = patch.company[0]; } if (s && patch.type) s.type = patch.type; }
+      commit('account');
     },
     login(role) { db.session = { role }; commit('session'); },
     logout() { db.session = { role: 'guest' }; commit('session'); },
     reset() { const r = db.session.role; db = fresh(); db.session = { role: r }; commit('reset'); }
   };
+  function initials(name) { return (name || 'NB').split(/\s+/).filter(w => /^[A-Za-z]/.test(w)).map(w => w[0]).join('').slice(0, 2).toUpperCase(); }
 
   return {
     get db() { return db; }, subscribe: fn => subs.push(fn),
-    seller, buyer, conv, me, convsFor, unread, lastActivity, sellsAll, sellsProduct, ...A,
-    catalogueFor(sid) { return db.catalogue[sid]; },
+    seller, buyer, conv, enq, pairConv, me, convsFor, enquiriesFor, unread, lastActivity, sellsAll, sellsProduct, initials, ...A,
+    photo: key => db.photos[key] || null,
+    /* a directory seller's catalogue is their listed products, all live */
+    catalogueFor(sid) {
+      if (!db.catalogue[sid]) { const s = seller(sid); if (!s) return []; db.catalogue[sid] = s.products.map(n => ({ name: n, category: ((SEED.PRODUCTS.find(p => p.name === n) || {}).category) || (s.categories[0] || {}).name || '', moq: '—', status: 'Live' })); }
+      return db.catalogue[sid];
+    },
     notificationsFor(who) { return db.notifications.filter(n => n.to === who); }
   };
 })();

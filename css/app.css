@@ -76,7 +76,7 @@ body.has-overlay { overflow: hidden; }
 .toast.in { opacity: 1; transform: translate(-50%, 0); }
 .toast button { background: none; border: 0; color: #fff; font: 600 14px Inter, sans-serif; text-decoration: underline; cursor: pointer; }
 
-/* The role tabs now live in the flow sidebar — see css/flownav.css. */
+/* The Guest / Buyer / Seller switch lives in css/flownav.css. */
 
 .is-hidden { display: none !important; }
 
