@@ -16,7 +16,8 @@ const Responsive = (function () {
       ['Log in', '/login'], ['Register for free', '/register/buyer']
     ],
     buyer: [
-      ['About Us', '/about'], ['How it Works', '/how'], ['Category', '/categories'], ['Pricing', '/pricing'], ['Find a Seller', '/find'],
+      /* no Pricing once registered — see js/sync.js */
+      ['About Us', '/about'], ['How it Works', '/how'], ['Category', '/categories'], ['Find a Seller', '/find'],
       null,
       ['Overview', '/overview'], ['My enQ', '/myenq'], ['Notifications', '/notifications'], ['Shortlists', '/shortlists'], ['Profile & Settings', '/settings']
     ],

@@ -15,9 +15,27 @@ const U = {
       U.bindCardActions(card, s);
     });
   },
+  /* A guest sees that a seller exists, not who it is. The identity is blurred rather
+     than blanked, so the listing still reads as real and the gate has something to
+     promise. Nothing is unblurred client-side: the blur sits on the placeholder the
+     masking already leaves behind, so no real name, logo or contact ever reaches the
+     DOM for a guest — per the anti-scraping rule in the SRS. */
+  maskSellerIdentity(root) {
+    if (U.role() !== 'guest') return;
+    root.querySelectorAll([
+      '[data-name="name"]', '[data-name="logo"]', '[data-name="identity"]',
+      '[data-name="Seller name"]', '[data-name="avatar"]', '[data-name="contact"]',
+      '[data-name="Verified seller name"]', '[data-name="trust"]'
+    ].join(',')).forEach(p => p.classList.add('guest-blur'));
+    /* seller names drawn into the Figma snapshot (home, how it works) are static
+       text, so blur them where they sit */
+    root.querySelectorAll('[data-name^="Supplier / "], [data-name^="Seller card"], [data-name^="Seller row / "]')
+      .forEach(c => { const t = c.querySelector('[data-name="name"], [data-name="Seller name"]'); if (t) t.classList.add('guest-blur'); });
+  },
   bindCardActions(card, s) {
     card.dataset.bound = '1';
     const guest = U.role() === 'guest';
+    U.maskSellerIdentity(card);
     $.on(card, () => guest ? U.guestGate() : App.go('/seller/' + (s ? s.id : 'srilakshmi')));
     card.querySelectorAll('[data-name="Btn / Send enquiry"], [data-name="Button / Send enquiry"]').forEach(b => $.on(b, () => guest ? U.guestGate() : Modals.enquiry(Object.assign({ sellerId: s ? s.id : null }, U.carry()))));
     const sl = card.querySelector('[data-name="Btn / Shortlist"], [data-name^="Btn / Remove from shortlist"], [data-name="Btn / Shortlist seller"]');

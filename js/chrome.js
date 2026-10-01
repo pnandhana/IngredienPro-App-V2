@@ -134,6 +134,9 @@ const Chrome = (function () {
     /* List your business, wherever it appears */
     el.querySelectorAll('[data-name="Btn / List your business"]').forEach(b => $.on(b, () => App.go('/register/seller')));
     const sb = el.querySelector('[data-name="Account sidebar"]');
+    /* lets the stylesheet floor the page at the viewport, so every account tab is the
+       same height and the rail never stops mid-window on the short ones */
+    if (sb) el.classList.add('has-account-rail');
     if (sb && acc && role === 'buyer') overviewItem(sb, route && route.controller === Pages.overview);
     if (sb && acc) {
       const count = (label, n) => {

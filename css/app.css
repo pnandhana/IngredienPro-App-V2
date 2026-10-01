@@ -119,3 +119,21 @@ body.has-overlay { overflow: hidden; }
 .screen [data-name="Subcategory grid"] { overflow-y: auto; overscroll-behavior: contain; }
 .screen [data-name="Subcategory grid"]::-webkit-scrollbar { width: 8px; }
 .screen [data-name="Subcategory grid"]::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 4px; }
+
+/* ---- Guest masking -------------------------------------------------------
+   A guest may see that a seller exists, never who it is. The identity slots are
+   blurred rather than emptied so the listing still reads as a real one. The blur
+   is cosmetic only — the masking in pages.js means the real name, logo and
+   contact never reach the DOM for a guest, so this cannot be undone in devtools. */
+.guest-blur { filter: blur(5px); user-select: none; pointer-events: none; }
+.guest-blur * { pointer-events: none; }
+@media (prefers-reduced-transparency: reduce) { .guest-blur { filter: blur(4px); } }
+
+/* ---- My Account: one page height across every tab ------------------------
+   Figma draws each tab at its own height and the renderer bakes that in as an
+   inline min-height, so switching tabs changed the page height and the account
+   rail stopped mid-window on the short tabs. Floor the page at the viewport and
+   let the body take the slack, so the rail always runs the full page. */
+.screen.has-account-rail { min-height: 100vh !important; }
+.screen.has-account-rail > [data-name="Body"] { flex: 1 1 auto !important; }
+.screen.has-account-rail > [data-name="Body"] > [data-name="Account sidebar"] { align-self: stretch !important; }

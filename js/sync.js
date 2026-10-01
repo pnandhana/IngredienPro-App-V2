@@ -41,7 +41,13 @@ const Sync = (function () {
         const lab = $.texts(cat).find(d => /All Categories|Category/.test(d.textContent)); if (lab) lab.textContent = 'Category';
       }
       const make = label => { let it = pn.querySelector(`[data-name="Nav item / ${label}"]`); if (it) return it; it = $.clone(hiw); it.dataset.name = 'Nav item / ' + label; $.texts(it)[0].textContent = label; return it; };
-      if (hiw) [make('About Us'), hiw, cat, make('Pricing'), fas].filter(Boolean).forEach(n => pn.appendChild(n));
+      /* Pricing is a pre-signup question. Once you have an account the answer lives in
+         Subscription (seller) or the launch offer (buyer), so it leaves the main nav. */
+      const items = role === 'guest'
+        ? [make('About Us'), hiw, cat, make('Pricing'), fas]
+        : [make('About Us'), hiw, cat, fas];
+      if (hiw) items.filter(Boolean).forEach(n => pn.appendChild(n));
+      if (role !== 'guest') { const p = pn.querySelector('[data-name="Nav item / Pricing"]'); if (p) p.remove(); }
       const active = /^\/about/.test(path) ? 'About Us' : /^\/pricing/.test(path) ? 'Pricing' : /^\/how/.test(path) ? 'How it Works'
         : /^\/(categories|product)/.test(path) ? 'Category' : /^\/(find|seller)/.test(path) ? 'Find a Seller' : null;
       pn.querySelectorAll('[data-name^="Nav item / "]').forEach(it => {
