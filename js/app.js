@@ -176,10 +176,13 @@ const App = (function () {
     const box = document.createElement('div'); box.className = 'overlay-box';
     box.appendChild(el); wrap.appendChild(scrim); wrap.appendChild(box);
     if (opts.anchor) { box.style.top = opts.anchor.top + 'px'; box.style.right = opts.anchor.right + 'px'; }
-    scrim.addEventListener('click', () => { if (opts.onClose) opts.onClose(); closeOverlay(); });
+    /* a modal can refuse to close — the enquiry form asks before it bins
+       whatever you had typed into it */
+    const dismiss = () => { if (opts.confirmClose && !opts.confirmClose()) return; if (opts.onClose) opts.onClose(); closeOverlay(); };
+    scrim.addEventListener('click', dismiss);
     document.body.appendChild(wrap); document.body.classList.add('has-overlay');
     overlay = { wrap, opts };
-    document.onkeydown = e => { if (e.key === 'Escape' && overlay) { if (opts.onClose) opts.onClose(); closeOverlay(); } };
+    document.onkeydown = e => { if (e.key === 'Escape' && overlay) dismiss(); };
     return box;
   }
   function closeOverlay(opts) {

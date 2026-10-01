@@ -12,7 +12,8 @@ const Enq = (function () {
   const eLine = e => e.products.map(p => p.name).join(' + ');
   const eQty = e => e.products.map(p => `${p.qty} ${p.unit}`).join(' + ');
   function visible(r) { return Store.convsFor(r); }
-  const STATUS = (e, r) => ({ pending: r === 'seller' ? 'New request' : 'Awaiting acceptance', active: e.deal ? 'Deal agreed' : 'Active', declined: 'Declined', closed: 'Closed' }[e.status]);
+  /* "Success" rather than "Deal agreed", to match the action the buyer took */
+  const STATUS = (e, r) => ({ pending: r === 'seller' ? 'New request' : 'Awaiting acceptance', active: e.deal ? 'Success' : 'Active', declined: 'Declined', closed: 'Closed' }[e.status]);
 
   function preview(c, r) {
     const pend = c.enquiries.filter(e => e.status === 'pending');
@@ -250,7 +251,10 @@ const Enq = (function () {
       btn('Decline', '', () => Modals.reasons({ mode: 'decline', conv: c, enq: e }));
     }
     if (e.status === 'active' && !compact) {
-      if (!e.deal) btn('Mark deal agreed', '', () => { Store.dealAgreed(c.id, e.id, r); App.toast(`${e.id} marked as agreed`); App.refresh(); });
+      /* Only the buyer can mark an enquiry a success — it is what the seller is rated
+         on, so the seller cannot award it to themselves. The seller may close an
+         enquiry at any point, including mid-conversation. Matches the wireframe panel. */
+      if (r === 'buyer' && !e.deal) btn('Mark as success', '', () => { Store.dealAgreed(c.id, e.id, r); App.toast(`${e.id} marked as a success`); App.refresh(); });
       btn('Close', '', () => Modals.reasons({ mode: 'close', conv: c, enq: e }));
     }
     if (e.status === 'declined' && r === 'seller' && e.closedAt && (Date.now() - new Date(e.closedAt)) / 1000 < 300) {
@@ -354,6 +358,8 @@ const Enq = (function () {
     const listEl = document.createElement('div'); listEl.className = 'ep-list';
     [...c.enquiries].reverse().forEach(e => {
       const it = document.createElement('div'); it.className = 'ep-item'; it.dataset.enq = e.id; it.tabIndex = 0; it.setAttribute('role', 'button');
+      /* drives the timeline node: filled while the enquiry is live, hollow once it is finished */
+      it.dataset.state = e.status;
       it.setAttribute('aria-label', `${e.id}. ${e.products.map(p => `${p.name} (${p.qty} ${p.unit})`).join('. ')}. ${STATUS(e, r)} — show in chat`);
       it.innerHTML = '<div class="ep-row"><span class="ep-ref"></span><span class="ep-pill"></span></div><ul class="ep-prods"></ul><div class="ep-meta"></div>';
       it.querySelector('.ep-ref').textContent = e.id;

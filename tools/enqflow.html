@@ -1,0 +1,154 @@
+<!doctype html><meta charset="utf-8"><title>enqflow</title>
+<style>html,body{margin:0;background:#d6d6d6;font:12px/1.5 ui-monospace,monospace}iframe{border:0;display:block}pre{padding:12px;background:#fff;margin:0;white-space:pre-wrap}</style>
+<iframe id="f"></iframe><pre id="out"></pre>
+<script>
+/* Drives the rebuilt Send-enquiry form so each step can be screenshotted and
+   asserted. Serve the folder, then:
+     tools/enqflow.html?stage=open|unit|notes|two|saved|similar|report
+   Stages stop with the modal on screen; `report` prints JSON assertions.      */
+const P = new URLSearchParams(location.search);
+const STAGE = P.get('stage') || 'report';
+const W = +(P.get('w') || 1440), H = +(P.get('h') || 980);
+const f = document.getElementById('f'); f.style.width = W + 'px'; f.style.height = H + 'px';
+const out = document.getElementById('out');
+if (STAGE !== 'report') out.style.display = 'none';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const D = () => f.contentDocument, Wn = () => f.contentWindow;
+const q = s => D().querySelector(s), qa = s => [...D().querySelectorAll(s)];
+const byName = n => D().querySelector('[data-name="' + n + '"]');
+async function until(fn, t = 6000) { const s = Date.now(); while (Date.now() - s < t) { try { const v = fn(); if (v) return v; } catch (e) {} await sleep(70); } return null; }
+function click(el) { if (!el) throw new Error('click on nothing'); el.dispatchEvent(new (Wn().MouseEvent)('click', { bubbles: true, cancelable: true })); }
+function down(el) { el.dispatchEvent(new (Wn().MouseEvent)('mousedown', { bubbles: true, cancelable: true })); }
+function type(el, v) { el.textContent = v; el.dispatchEvent(new (Wn().Event)('input', { bubbles: true })); }
+function blur(el) { el.dispatchEvent(new (Wn().FocusEvent)('blur', { bubbles: false })); }
+function key(el, k) { el.dispatchEvent(new (Wn().KeyboardEvent)('keydown', { key: k, bubbles: true })); }
+const modal = () => q('.overlay [data-name="Modal / Send enquiry"]');
+const eds = () => [...modal().querySelectorAll('.editable')];
+const W_doc = () => ({ textContent: null });
+const vis = el => !!el && !el.classList.contains('is-hidden') && el.getBoundingClientRect().height > 0;
+const R = {}; const stop = s => STAGE === s;
+
+(async () => {
+  try {
+    localStorage.clear(); sessionStorage.clear();
+    f.src = '../index.html?as=buyer#/find';
+    await until(() => D() && D().querySelector('.screen'));
+    await until(() => qa('[data-seller-id]').length);
+
+    /* ---- open the modal from a seller row ---- */
+    const row = qa('[data-name="Seller list"] > [data-seller-id]')[0];
+    R.seller = row.dataset.sellerId;
+    click(row.querySelector('[data-name="Btn / Send enquiry"]'));
+    await until(modal);
+    await sleep(350);
+
+    const sim = () => byName('Similar sellers');
+    const wrap = () => sim().querySelector('.ip-reveal');
+    R.similarUnchecked = sim().querySelector('[data-name="Toggle row"]').getAttribute('aria-checked') === 'false';
+    R.similarCollapsed = !wrap().classList.contains('open');
+    R.notesCollapsed = !!modal().querySelector('.ip-disclose') && !modal().querySelector('.ip-disclose').classList.contains('is-hidden');
+    R.unitIsListbox = modal().querySelector('.ip-select').getAttribute('role') === 'combobox';
+    { const p1 = eds()[0]; type(p1, 'Turmeric'); await sleep(120);
+      D().dispatchEvent(new (Wn().KeyboardEvent)('keydown', { key: 'Escape', bubbles: true })); await sleep(250);
+      R.escAsksFirst = !!modal();
+      R.escToast = (D().querySelector('.toast') || W_doc()).textContent || null;
+      D().dispatchEvent(new (Wn().KeyboardEvent)('keydown', { key: 'Escape', bubbles: true })); await sleep(300);
+      R.escClosesSecond = !modal();
+      if (!modal()) { click(qa('[data-name="Seller list"] > [data-seller-id]')[0].querySelector('[data-name="Btn / Send enquiry"]')); await until(modal); await sleep(300); } }
+    if (stop('open')) return done();
+
+    /* ---- unit dropdown ---- */
+    const unit = modal().querySelector('.ip-select');
+    click(unit); await sleep(250);
+    const pop = q('.ip-select-pop') || document.querySelector('.ip-select-pop') || D().querySelector('.ip-select-pop');
+    R.unitPopOpens = !!pop;
+    R.unitOptions = pop ? [...pop.children].map(o => o.textContent.replace('✓', '').trim()) : [];
+    R.unitExpanded = unit.getAttribute('aria-expanded') === 'true';
+    if (stop('unit')) return done();
+    down(pop.children[0]); await sleep(200);               // pick kg
+    R.unitPicked = unit.textContent.trim().split(/\s+/)[0];
+
+    /* ---- notes disclosure ---- */
+    click(modal().querySelector('.ip-disclose')); await sleep(300);
+    R.notesOpens = modal().querySelector('.ip-reveal.open') !== null;
+    if (stop('notes')) return done();
+
+    /* ---- second product ---- */
+    const p1 = eds()[0];
+    R.prefilled = p1.textContent.trim().slice(0, 30);
+    if (!p1.textContent.trim()) { type(p1, 'Turmeric Powder'); key(p1, 'Enter'); await sleep(500); }
+    const qty = () => modal().querySelector('[data-name="Field / Quantity *"] .editable');
+    type(qty(), '5'); blur(qty()); await sleep(120);
+    click(byName('Button / + Add another product')); await sleep(500);
+    R.nowMulti = !!byName('Products');
+    R.openCards = modal().querySelectorAll('.is-open-product').length;
+    R.saveBtn = !!modal().querySelector('[data-name="Button / Save product"]');
+    R.saveLabel = R.saveBtn ? modal().querySelector('[data-name="Button / Save product"]').textContent.trim() : null;
+    if (stop('two')) return done();
+
+    /* ---- fill it and save ---- */
+    const card = modal().querySelector('.is-open-product');
+    const n2 = card.querySelector('[data-name="Field / Product or commodity *"] .editable');
+    type(n2, 'Paprika Oleoresin'); key(n2, 'Enter'); await sleep(600);
+    const card2 = modal().querySelector('.is-open-product');
+    const q2 = card2.querySelector('[data-name="Field / Quantity *"] .editable');
+    type(q2, '1,200'); blur(q2); await sleep(150);
+    click(modal().querySelector('[data-name="Button / Save product"]')); await sleep(500);
+    R.collapsedCards = modal().querySelectorAll('.product-summary').length;
+    R.stillOpen = modal().querySelectorAll('.is-open-product').length;
+    R.qtyNormalised = [...modal().querySelectorAll('.product-summary')].map(c => c.textContent).join(' | ').includes('1200');
+    if (stop('saved')) return done();
+
+    /* ---- similar sellers ---- */
+    click(byName('Similar sellers').querySelector('[data-name="Toggle row"]')); await sleep(450);
+    R.similarOpens = byName('Similar sellers').querySelector('.ip-reveal').classList.contains('open');
+    R.similarChecked = byName('Similar sellers').querySelector('[data-name="Toggle row"]').getAttribute('aria-checked') === 'true';
+    const lh = byName('List head');
+    R.listHead = lh ? lh.textContent.trim() : null;
+    R.searchHiddenWhenFew = !vis(byName('Search wrap'));
+    R.footer = byName('Footer').textContent.trim().slice(0, 110);
+    if (stop('similar')) return done();
+
+    /* ---- similar sellers on a one-product enquiry (more candidates) ---- */
+    click(modal().querySelector('[data-name="Products"] [data-name="Link / Remove"]')); await sleep(600);
+    R.backToSingle = !byName('Products');
+    click(byName('Similar sellers').querySelector('[data-name="Toggle row"]')); await sleep(450);
+    const reveal = () => byName('Similar sellers').querySelector('.ip-reveal');
+    R.one_similarOpens = reveal().classList.contains('open');
+    R.one_revealHeight = Math.round(reveal().getBoundingClientRect().height);
+    R.one_listHead = (byName('List head') || {}).textContent;
+    R.one_rows = byName('Seller rows').children.length;
+    R.one_footer = byName('Footer').textContent.trim().slice(0, 60);
+    /* the row checkbox must agree with the count above it */
+    const cbState = () => { const r = byName('Seller rows').children[0]; const b = r.querySelector('[data-name="Checkbox"]') || r.children[0];
+      return { bg: b.style.background, aria: r.getAttribute('aria-checked') }; };
+    R.cb_afterFlip = cbState();
+    const sa = [...byName('List head').querySelectorAll('div')].find(d => /Clear all|Select all/.test(d.textContent));
+    click(sa); await sleep(250); R.one_afterClear = byName('List head').textContent; R.cb_afterClear = cbState();
+    click(sa); await sleep(250); R.one_afterSelectAll = byName('List head').textContent; R.cb_afterSelectAll = cbState();
+    R.modalHugs = Math.round(modal().getBoundingClientRect().height);
+    R.slotScrollable = (() => { const sl = modal().querySelector('.enq-slot'); return Wn().getComputedStyle(sl).overflowY; })();
+    if (stop('simone')) return done();
+
+    /* ---- duplicate + cap edge cases ---- */
+    click(byName('Button / + Add another product')); await sleep(600);
+    const c3 = await until(() => { const c = modal().querySelector('.is-open-product'); const e = c && c.querySelector('[data-name="Field / Product or commodity *"] .editable'); return e && !e.textContent.trim() ? c : null; });
+    if (!c3) throw new Error('no empty open card after add');
+    const n3 = c3.querySelector('[data-name="Field / Product or commodity *"] .editable');
+    type(n3, 'Paprika Oleoresin'); key(n3, 'Enter'); await sleep(600);
+    const c3b = modal().querySelector('.is-open-product');
+    const q3 = c3b.querySelector('[data-name="Field / Quantity *"] .editable');
+    type(q3, '3'); blur(q3); await sleep(150);
+    click(modal().querySelector('[data-name="Button / Save product"]')); await sleep(400);
+    R.dupBlocked = !!modal().querySelector('.field-err');
+    R.dupMsg = (modal().querySelector('.field-err') || {}).textContent || null;
+
+    /* bad quantity */
+    const q4 = modal().querySelector('.is-open-product [data-name="Field / Quantity *"] .editable');
+    type(q4, 'abc'); blur(q4); await sleep(200);
+    R.badQty = !!modal().querySelector('[data-name="Field / Quantity *"] .field-err');
+    done();
+  } catch (e) { R._ERROR = String(e && e.stack || e); done(); }
+})();
+function done() { out.textContent = JSON.stringify(R, null, 2); document.title = 'enqflow done'; }
+</script>

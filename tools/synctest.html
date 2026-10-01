@@ -57,19 +57,19 @@ const footCols=()=>qa('[data-name="Section / Footer"] [data-name^="Col / "], [da
     let e=[...m.querySelectorAll('.editable')]; type(e[0],'Turmeric Powder'); key(e[0],'Enter'); await sleep(900);
     m=q('.overlay [data-name="Modal / Send enquiry"]'); e=[...m.querySelectorAll('.editable')]; type(e[1],'2');
     click(m.querySelector('[data-name="Button / + Add another product"]')); await sleep(1000);
-    m=q('.overlay [data-name="Modal / Send enquiry"]'); res.mpAfterAdd={open:!!m.querySelector('.is-open-product'), summaries:m.querySelectorAll('.product-summary').length, done:!!m.querySelector('.product-done')};
+    m=q('.overlay [data-name="Modal / Send enquiry"]'); res.mpAfterAdd={open:!!m.querySelector('.is-open-product'), summaries:m.querySelectorAll('.product-summary').length, save:!!m.querySelector('[data-name="Button / Save product"]')};
     // missing quantity → inline message, stays open
     let op=m.querySelector('.is-open-product'); e=[...op.querySelectorAll('.editable')]; type(e[0],'Chilli Powder Teja S17'); key(e[0],'Enter'); await sleep(900);
-    m=q('.overlay [data-name="Modal / Send enquiry"]'); op=m.querySelector('.is-open-product'); click(op.querySelector('.product-done')); await sleep(300);
+    m=q('.overlay [data-name="Modal / Send enquiry"]'); op=m.querySelector('.is-open-product'); click(op.querySelector('[data-name="Button / Save product"]')); await sleep(300);
     res.mpInlineError=(m.querySelector('.field-err')||{}).textContent; res.mpStillOpen=!!m.querySelector('.is-open-product');
     e=[...op.querySelectorAll('.editable')]; type(e[1],'5'); key(e[1],'Enter'); await sleep(1000);
     m=q('.overlay [data-name="Modal / Send enquiry"]'); res.mpAfterEnter={open:!!m.querySelector('.is-open-product'), summaries:[...m.querySelectorAll('.product-summary')].map(s=>s.innerText.split('\n').slice(0,2).join(' '))};
     click(m.querySelectorAll('.product-summary')[0]); await sleep(1000);
     m=q('.overlay [data-name="Modal / Send enquiry"]'); res.mpReopen={open:!!m.querySelector('.is-open-product'), openName:(m.querySelector('.is-open-product .editable')||{}).textContent, summaries:m.querySelectorAll('.product-summary').length};
-    click(m.querySelector('.is-open-product .product-done')); await sleep(1000);
+    click(m.querySelector('.is-open-product [data-name="Button / Save product"]')); await sleep(1000);
     m=q('.overlay [data-name="Modal / Send enquiry"]'); click(m.querySelector('[data-name="Button / + Add another product"]')); await sleep(1000);
     m=q('.overlay [data-name="Modal / Send enquiry"]'); res.mpBlankOpen=!!m.querySelector('.is-open-product');
-    const tog=m.querySelector('[data-name="Similar sellers"] [data-name="Toggle row"]'); if(tog){ click(tog); await sleep(1000); m=q('.overlay [data-name="Modal / Send enquiry"]'); }
+    // similar sellers is opt-in now and starts unticked — nothing to switch off
     click(m.querySelector('[data-name="Button / Send enquiry"]')); await sleep(1400);
     const c=S().db.conversations.find(x=>x.sellerId==='srilakshmi'); res.mpSent=c && c.enquiries.map(x=>x.id+': '+x.products.map(p=>p.name+' '+p.qty+' '+p.unit).join(' + '));
     res.mpCard=(q('.enq-card')||{}).innerText && q('.enq-card').innerText.replace(/\n+/g,' | ').slice(0,200);

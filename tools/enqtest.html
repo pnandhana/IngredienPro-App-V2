@@ -48,8 +48,8 @@ async function step(name,fn){ try{ await fn(); }catch(e){ res[name+'_ERROR']=Str
     let eds=[...m.querySelectorAll('.editable')]; type(eds[0],product); key(eds[0],'Enter'); await sleep(900);
     m=await until(()=>q('.overlay [data-name="Modal / Send enquiry"]')); eds=[...m.querySelectorAll('.editable')];
     type(eds[1],qty);
-    // similar sellers off, so exactly one seller gets it
-    const tog=m.querySelector('[data-name="Similar sellers"] [data-name="Toggle row"]'); if(tog && S()) { click(tog); await sleep(900); m=await until(()=>q('.overlay [data-name="Modal / Send enquiry"]')); eds=[...m.querySelectorAll('.editable')]; if(eds[1] && !eds[1].textContent) type(eds[1],qty); }
+    // "Also send to similar sellers" is opt-in and starts unticked, so exactly one seller gets it
+    res['similarOptIn_'+qty]=m.querySelector('[data-name="Similar sellers"] [data-name="Toggle row"]').getAttribute('aria-checked')==='false';
     res['footer_'+qty]=(m.querySelector('[data-name="Footer"]')||{}).textContent.slice(0,90);
     click(m.querySelector('[data-name="Button / Send enquiry"]')); await sleep(1300);
   };
